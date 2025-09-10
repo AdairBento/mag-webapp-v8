@@ -1,0 +1,26 @@
+{
+  "title": "contract.signed.v1",
+  "type": "object",
+  "properties": {
+    "contractId": {
+      "type": "string"
+    },
+    "signedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "docId": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": [
+    "contractId",
+    "signedAt",
+    "docId",
+    "url"
+  ]
+}

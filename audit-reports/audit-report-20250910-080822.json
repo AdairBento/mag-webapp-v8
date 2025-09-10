@@ -1,0 +1,60 @@
+{
+  "Timestamp": "2025-09-10 08:07:47",
+  "ProjectInfo": {
+    "Name": "mag-webapp-v8",
+    "Version": null,
+    "Description": null,
+    "NodeVersion": "20.16.0",
+    "NpmVersion": "10.8.1",
+    "Author": null,
+    "License": null,
+    "Scripts": "{\"dev\":\"nodemon mag-webapp-v8-integrated/apps/api/src/index.js\",\"lint\":\"eslint .\",\"format\":\"prettier --write .\",\"test\":\"jest\",\"coverage\":\"nyc npm test\",\"docs:openapi\":\"node scripts/generate-openapi.cjs\",\"docs:jsdoc\":\"jsdoc -c jsdoc.json\",\"audit:deps\":\"npm audit\",\"audit:licenses\":\"npx license-checker --production --json\",\"load\":\"artillery run load_test.yml\",\"audit\":\"npm run lint && npm test\",\"audit:node\":\"pwsh -File ./scripts/audit-node.ps1 -GenerateHTML\",\"audit:api\":\"pwsh -File ./scripts/audit-node.ps1 -ProjectPath ./apps/api -GenerateHTML -OutputPath ./apps/api/audit-reports\"}",
+    "Dependencies": 1,
+    "DevDependencies": 11
+  },
+  "Security": {
+    "Vulnerabilities": {
+      "Critical": 0,
+      "High": 0,
+      "Moderate": 0,
+      "Low": 0,
+      "Info": 0,
+      "Total": 0
+    },
+    "SensitiveFiles": []
+  },
+  "Quality": {
+    "CodeMetrics": {
+      "TotalFiles": 38,
+      "TotalLines": 1872,
+      "AverageFileSize": 49.26
+    }
+  },
+  "Dependencies": {
+    "Unused": {
+      "Dependencies": [],
+      "DevDependencies": [],
+      "Count": 0
+    },
+    "Outdated": {
+      "Count": 0,
+      "Packages": []
+    }
+  },
+  "Tests": {
+    "Success": false
+  },
+  "Performance": {
+    "Suggestions": [
+      "Configure scripts de build/otimização no package.json."
+    ],
+    "NodeModulesSize": 405.67,
+    "OptimizationScripts": []
+  },
+  "Summary": {
+    "Grade": "A",
+    "Score": 100,
+    "EndTime": "2025-09-10 08:08:22",
+    "Duration": "00:35"
+  }
+}

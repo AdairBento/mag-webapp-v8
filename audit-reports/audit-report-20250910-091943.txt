@@ -1,0 +1,46 @@
+================================================================================
+                         RELATÓRIO DE AUDITORIA NODE.JS
+================================================================================
+Data: 2025-09-10 09:18:05
+Duração: 01:38
+
+--- PROJETO ---
+Nome: mag-webapp-v8
+Versão: 
+Descrição: 
+Node.js: 22.13.0
+NPM: 10.9.2
+Dependências: 1
+DevDependências: 17
+
+--- SEGURANÇA ---
+Críticas: 0
+Altas:    0
+Médias:   5
+Baixas:   2
+Total:    7
+Sensíveis: 
+
+--- QUALIDADE ---
+ESLint: Erros= | Avisos= | Arquivos=
+Métricas: Arquivos=38 | Linhas=1872 | Média=49.26
+
+--- DEPENDÊNCIAS ---
+Desatualizadas: 14
+Não Utilizadas: 6
+
+--- TESTES ---
+
+
+--- PERFORMANCE ---
+node_modules: 436.78 MB
+Tamanhos de build:
+  - IsFixed: False KB
+Scripts: 
+Sugestões:
+  • Configure scripts de build/otimização no package.json.
+
+--- RESULTADO ---
+PONTUAÇÃO: 80/100
+NOTA: B
+================================================================================

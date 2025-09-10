@@ -1,0 +1,12 @@
+{
+  "title": "vehicle.updated.v1",
+  "type": "object",
+  "properties": {
+    "vehicleId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "vehicleId"
+  ]
+}

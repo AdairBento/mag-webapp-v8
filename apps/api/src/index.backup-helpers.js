@@ -1,0 +1,357 @@
+﻿// src/index.js
+// MAG API — Express + Prisma (alias availability, paginação, CORS/Helmet, filtros e POSTs + cálculo de amount)
+
+require("dotenv/config");
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const { PrismaClient } = require("@prisma/client");
+const { addTraceId, httpLogger } = require("./middleware-logger");
+const { errorHandler, ApiError } = require("./middleware-errors");
+const { createHealthHandler } = require("./health-extended");
+const { normalizeAvailabilityParams } = require("./availability-alias");
+const { RENTAL_STATUSES, isValidStatus, isBlockingStatus } = require("./utils-status");
+const { normalizeAmount } = require("./utils-amount");
+
+const prisma = new PrismaClient();
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+/* ===================== MIDDLEWARES ===================== */
+app.use(helmet());
+app.use(cors()); // ajuste: cors({ origin: ["http://localhost:5173"] })
+app.use(express.json());
+app.use(addTraceId);
+app.use(httpLogger);
+
+/* ===================== HELPERS ===================== */
+function getPaging(req) {
+  const page = Math.max(1, parseInt(req.query.page || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || "20", 10)));
+  const skip = (page - 1) * limit;
+  return { page, limit, skip };
+}
+
+function requireNonEmpty(value, field) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    throw new ApiError("bad_request", `${field} é obrigatório`, 400, { field });
+  }
+  return value;
+}
+  return value;
+}
+function isIsoDate(s) {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(s);
+}
+function requireIsoDate(s, field) {
+  if (!isIsoDate(s)) {
+    throw new ApiError("bad_request", ${field} inválido (use YYYY-MM-DD), 400, { [field]: s });
+  }
+  return s;
+}
+function toDate(s) {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) throw new ApiError("bad_request", data inválida, 400, { value: s });
+  return d;
+}
+function diffDaysUTC(a, b) {
+  const MS = 24 * 60 * 60 * 1000;
+  const start = Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate());
+  const end = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
+  return Math.round((end - start) / MS);
+}
+
+/* ===================== ROOT ===================== */
+app.get("/", (_req, res) => {
+  res.json({ name: "MAG API", version: "1.0.0", status: "ok" });
+});
+
+/* ===================== INTERNAL ===================== */
+app.get("/internal/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+app.get("/internal/health/extended", createHealthHandler({ prisma }));
+
+app.post("/internal/seed", async (_req, res, next) => {
+  try {
+    const tenant = await prisma.tenant.upsert({
+      where: { id: "022d0c59-4363-4993-a485-9adf29719824" },
+      update: {},
+      create: { id: "022d0c59-4363-4993-a485-9adf29719824", name: "Demo Tenant", domain: "demo.local" },
+    });
+
+    const client = await prisma.client.upsert({
+      where: { id: "3d2f8a39-3e5f-4a27-96e3-80fc02502789" },
+      update: {},
+      create: {
+        id: "3d2f8a39-3e5f-4a27-96e3-80fc02502789",
+        name: "Cliente Demo",
+        email: "cliente.demo@mail.local",
+        phone: "5511999998888",
+        document: "00000000000",
+        address: "Rua Teste, 123",
+        tenantId: tenant.id,
+      },
+    });
+
+    const vehicle = await prisma.vehicle.upsert({
+      where: { id: "d0e03f05-50aa-45fe-b049-de1bff02ac85" },
+      update: {},
+      create: {
+        id: "d0e03f05-50aa-45fe-b049-de1bff02ac85",
+        model: "Onix",
+        brand: "Chevrolet",
+        year: 2022,
+        plate: "ABC8736",
+        color: "Prata",
+        fuelType: "Flex",
+        category: "Hatch",
+        dailyRate: "120.00",
+        status: "available",
+        tenantId: tenant.id,
+      },
+    });
+
+    res.json({ tenant, client, vehicle });
+  } catch (err) { next(err); }
+});
+
+/* ===================== API v1 ===================== */
+// Availability (contrato simples) + alias raiz
+const availabilityHandler = async (_req, res, next) => {
+  try {
+    res.json({
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, pages: 1 },
+      meta: { blockedVehicleCount: 0 },
+    });
+  } catch (err) { next(err); }
+};
+app.get("/api/v1/availability", normalizeAvailabilityParams, availabilityHandler);
+app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+
+// Clients (GET com paginação)
+app.get("/api/v1/clients", async (req, res, next) => {
+  try {
+    const { tenantId } = req.query;
+    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+
+    const { page, limit, skip } = getPaging(req);
+    const [items, total] = await Promise.all([
+      prisma.client.findMany({ where: { tenantId }, skip, take: limit }),
+      prisma.client.count({ where: { tenantId } }),
+    ]);
+    res.json({ data: items, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (err) { next(err); }
+});
+
+// Vehicles (GET com paginação)
+app.get("/api/v1/vehicles", async (req, res, next) => {
+  try {
+    const { tenantId } = req.query;
+    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+
+    const { page, limit, skip } = getPaging(req);
+    const [items, total] = await Promise.all([
+      prisma.vehicle.findMany({ where: { tenantId }, skip, take: limit }),
+      prisma.vehicle.count({ where: { tenantId } }),
+    ]);
+    res.json({ data: items, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (err) { next(err); }
+});
+
+// Rentals (GET com paginação + filtros opcionais)
+app.get("/api/v1/rentals", async (req, res, next) => {
+  try {
+    const { tenantId, status, startFrom, endTo } = req.query;
+    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+
+    if (status && !isValidStatus(status)) {
+      return res.status(400).json({
+        error: "bad_request",
+        message: "status inválido",
+        details: { allowed: Object.values(RENTAL_STATUSES) },
+      });
+    }
+    if ((startFrom && !isIsoDate(startFrom)) || (endTo && !isIsoDate(endTo))) {
+      return res.status(400).json({
+        error: "bad_request",
+        message: "datas inválidas (use YYYY-MM-DD)",
+        details: { startFrom, endTo },
+      });
+    }
+
+    const where = { tenantId };
+    if (status) where.status = status;
+    if (startFrom) where.startDate = Object.assign(where.startDate ?? {}, { gte: new Date(startFrom) });
+    if (endTo) where.endDate = Object.assign(where.endDate ?? {}, { lte: new Date(endTo) });
+
+    const { page, limit, skip } = getPaging(req);
+    const [items, total] = await Promise.all([
+      prisma.rental.findMany({
+        where,
+        include: {
+          client: true,
+          vehicle: true,
+          tenant: { select: { id: true, name: true, domain: true } },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.rental.count({ where }),
+    ]);
+
+    res.json({
+      data: items,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+      filters: { status: status || null, startFrom: startFrom || null, endTo: endTo || null },
+    });
+  } catch (err) { next(err); }
+});
+
+// Rentals (GET por id)
+app.get("/api/v1/rentals/:id", async (req, res, next) => {
+  try {
+    const rental = await prisma.rental.findUnique({ where: { id: req.params.id } });
+    if (!rental) return res.status(404).json({ error: "not_found", message: "not_found" });
+    res.json({ data: rental });
+  } catch (err) { next(err); }
+});
+
+/* ===================== CREATES (POST) ===================== */
+// POST /api/v1/clients
+app.post("/api/v1/clients", async (req, res, next) => {
+  try {
+    const { tenantId, name, email, phone, document, address } = req.body;
+    requireNonEmpty(tenantId, "tenantId");
+    requireNonEmpty(name, "name");
+
+    const client = await prisma.client.create({
+      data: { tenantId, name, email: email || null, phone: phone || null, document: document || null, address: address || null },
+    });
+
+    res.status(201).json({ data: client });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/vehicles
+app.post("/api/v1/vehicles", async (req, res, next) => {
+  try {
+    const { tenantId, model, brand, year, plate, color, fuelType, category, dailyRate, status } = req.body;
+    requireNonEmpty(tenantId, "tenantId");
+    requireNonEmpty(model, "model");
+    requireNonEmpty(brand, "brand");
+    requireNonEmpty(year, "year");
+    requireNonEmpty(plate, "plate");
+    const normalizedRate = dailyRate !== undefined ? normalizeAmount(dailyRate) : null;
+
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        tenantId, model, brand, year: Number(year), plate,
+        color: color || null, fuelType: fuelType || null, category: category || null,
+        dailyRate: normalizedRate, status: status || "available",
+      },
+    });
+
+    res.status(201).json({ data: vehicle });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/rentals
+// Campos: tenantId, clientId, vehicleId, startDate, endDate, status (opcional; default 'confirmed'), amount (opcional)
+app.post("/api/v1/rentals", async (req, res, next) => {
+  try {
+    const { tenantId, clientId, vehicleId, startDate, endDate, status, amount } = req.body;
+
+    requireNonEmpty(tenantId, "tenantId");
+    requireNonEmpty(clientId, "clientId");
+    requireNonEmpty(vehicleId, "vehicleId");
+    requireIsoDate(startDate, "startDate");
+    requireIsoDate(endDate, "endDate");
+
+    const start = toDate(startDate);
+    const end = toDate(endDate);
+    if (end <= start) {
+      throw new ApiError("bad_request", "endDate deve ser maior que startDate", 400, { startDate, endDate });
+    }
+
+    const rentalStatus = status || RENTAL_STATUSES.CONFIRMED;
+    if (!isValidStatus(rentalStatus)) {
+      throw new ApiError("bad_request", "status inválido", 400, { allowed: Object.values(RENTAL_STATUSES) });
+    }
+
+    // valida entidades
+    const [tenant, client, vehicle] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId } }),
+      prisma.client.findUnique({ where: { id: clientId } }),
+      prisma.vehicle.findUnique({ where: { id: vehicleId } }),
+    ]);
+    if (!tenant) throw new ApiError("not_found", "tenant não encontrado", 404, { tenantId });
+    if (!client) throw new ApiError("not_found", "client não encontrado", 404, { clientId });
+    if (!vehicle) throw new ApiError("not_found", "vehicle não encontrado", 404, { vehicleId });
+
+    // conflito somente para statuses bloqueantes
+    if (isBlockingStatus(rentalStatus)) {
+      const conflicting = await prisma.rental.findFirst({
+        where: {
+          tenantId,
+          vehicleId,
+          status: RENTAL_STATUSES.CONFIRMED,
+          NOT: [{ endDate: { lte: start } }, { startDate: { gte: end } }],
+        },
+      });
+      if (conflicting) {
+        throw new ApiError("conflict", "Conflito de agenda para este veículo", 409, {
+          vehicleId,
+          requested: { startDate, endDate },
+          conflictWith: { id: conflicting.id, startDate: conflicting.startDate, endDate: conflicting.endDate, status: conflicting.status },
+        });
+      }
+    }
+
+    // amount: usa o enviado OU calcula (diárias × dailyRate)
+    let finalAmount = amount;
+    if (finalAmount === undefined || finalAmount === null || String(finalAmount).trim() === "") {
+      const days = Math.max(1, diffDaysUTC(start, end)); // garante pelo menos 1 diária
+      const rate = vehicle.dailyRate ? parseFloat(vehicle.dailyRate) : 0;
+      finalAmount = normalizeAmount(days * rate);
+    } else {
+      finalAmount = normalizeAmount(finalAmount);
+    }
+
+    const rental = await prisma.rental.create({
+      data: {
+        tenantId, clientId, vehicleId,
+        startDate: start, endDate: end,
+        status: rentalStatus,
+        amount: finalAmount,
+      },
+    });
+
+    res.status(201).json({ data: rental });
+  } catch (err) { next(err); }
+});
+
+/* ===================== 404 & ERROR ===================== */
+app.use((req, res) => {
+  res.status(404).json({ error: "route_not_found", path: req.path });
+});
+app.use(errorHandler);
+
+/* ===================== START ===================== */
+app.listen(PORT, () => {
+  console.log(API rodando em http://localhost:);
+  console.log(Health:   http://localhost:/internal/health);
+  console.log(Extended: http://localhost:/internal/health/extended);
+  console.log(Seed:     POST http://localhost:/internal/seed);
+  console.log(Clients:  http://localhost:/api/v1/clients?tenantId=...&page=1&limit=20);
+  console.log(Vehicles: http://localhost:/api/v1/vehicles?tenantId=...&page=1&limit=20);
+  console.log(Rentals:  http://localhost:/api/v1/rentals?tenantId=...&page=1&limit=20);
+  console.log(Avail.:   http://localhost:/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD);
+});
+
+// Encerrar Prisma com graça
+process.on("SIGINT", async () => { await prisma.(); process.exit(0); });
+process.on("SIGTERM", async () => { await prisma.(); process.exit(0); });
+

@@ -1,0 +1,12 @@
+{
+  "title": "rental.overdue.v1",
+  "type": "object",
+  "properties": {
+    "rentalId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "rentalId"
+  ]
+}

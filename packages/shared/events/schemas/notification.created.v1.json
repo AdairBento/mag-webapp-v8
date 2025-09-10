@@ -1,0 +1,29 @@
+{
+  "title": "notification.created.v1",
+  "type": "object",
+  "properties": {
+    "notificationId": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "notificationId",
+    "tenantId",
+    "type",
+    "title",
+    "createdAt"
+  ]
+}

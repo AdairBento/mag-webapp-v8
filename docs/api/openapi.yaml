@@ -1,0 +1,263 @@
+openapi: 3.0.3
+info:
+  title: MAG Rentals API
+  version: 1.0.0
+  description: API v1 estável para operações de locação, veículos, clientes, pagamentos e relatórios.
+servers:
+  - url: https://api.example.com/api/v1
+    description: Produção
+  - url: http://localhost:3000/api/v1
+    description: Local
+tags:
+  - name: Rentals
+  - name: Vehicles
+  - name: Clients
+  - name: Payments
+  - name: Reports
+  - name: Internal
+paths:
+  /rentals:
+    get:
+      tags: [Rentals]
+      summary: Lista alugueis (paginado)
+      parameters:
+        - in: query
+          name: clientId
+          schema: { type: string }
+        - in: query
+          name: vehicleId
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRentals'
+    post:
+      tags: [Rentals]
+      summary: Cria um aluguel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRentalRequest'
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRentalResponse'
+  /rentals/{rentalId}:
+    get:
+      tags: [Rentals]
+      summary: Detalha um aluguel
+      parameters:
+        - in: path
+          name: rentalId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rental' }
+  /rentals/{rentalId}/confirm:
+    post:
+      tags: [Rentals]
+      summary: Confirma aluguel (após pagamento)
+      parameters:
+        - in: path
+          name: rentalId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Confirmado
+  /rentals/{rentalId}/return:
+    post:
+      tags: [Rentals]
+      summary: Devolve veículo e encerra aluguel
+      parameters:
+        - in: path
+          name: rentalId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                returnLocation: { type: string }
+                returnDate: { type: string, format: date-time }
+      responses:
+        '200': { description: OK }
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: Lista veículos
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [available, rented, maintenance] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Vehicle' }
+  /clients:
+    get:
+      tags: [Clients]
+      summary: Lista clientes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Client' }
+    post:
+      tags: [Clients]
+      summary: Cria cliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateClientRequest' }
+      responses:
+        '201': { description: Criado }
+  /payments/charge:
+    post:
+      tags: [Payments]
+      summary: Inicia cobrança de um aluguel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rentalId: { type: string }
+                method: { type: string, enum: [pix, credit_card, boleto] }
+      responses:
+        '202': { description: Aceito }
+  /reports/revenue:
+    get:
+      tags: [Reports]
+      summary: Resumo de receita por período
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string }
+                  totalRevenue: { type: number }
+                  currency: { type: string, default: BRL }
+  /internal/health:
+    get:
+      tags: [Internal]
+      summary: Health Check
+      responses:
+        '200': { description: OK }
+  /internal/metrics:
+    get:
+      tags: [Internal]
+      summary: Métricas Prometheus
+      responses:
+        '200': { description: OK }
+components:
+  schemas:
+    Money:
+      type: object
+      properties:
+        amount: { type: number }
+        currency: { type: string, default: BRL }
+    Client:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        cpf: { type: string }
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string }
+        model: { type: string }
+        plate: { type: string }
+        year: { type: integer }
+        dailyRate: { $ref: '#/components/schemas/Money' }
+        status: { type: string, enum: [available, rented, maintenance] }
+    Rental:
+      type: object
+      properties:
+        id: { type: string }
+        client: { $ref: '#/components/schemas/Client' }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        period:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+        status: { type: string, enum: [pending, active, overdue, completed, cancelled] }
+        amount: { $ref: '#/components/schemas/Money' }
+        isOverdue: { type: boolean }
+    PaginatedRentals:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Rental' }
+        pagination:
+          type: object
+          properties:
+            page: { type: integer }
+            limit: { type: integer }
+            total: { type: integer }
+    CreateRentalRequest:
+      type: object
+      required: [clientId, vehicleId, startDate, endDate, expectedReturnLocation]
+      properties:
+        clientId: { type: string }
+        vehicleId: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        expectedReturnLocation: { type: string }
+    CreateRentalResponse:
+      type: object
+      properties:
+        message: { type: string, example: "Rental criado com sucesso" }
+        rentalId: { type: string }

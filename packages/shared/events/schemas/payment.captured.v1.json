@@ -1,0 +1,12 @@
+{
+  "title": "payment.captured.v1",
+  "type": "object",
+  "properties": {
+    "paymentId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "paymentId"
+  ]
+}

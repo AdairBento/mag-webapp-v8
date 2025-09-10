@@ -1,0 +1,53 @@
+﻿import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import pino from "pino";
+import pinoHttp from "pino-http";
+import { healthRouter } from "./ui/internal/health";
+import { metricsRouter, registerMetrics } from "./ui/internal/metrics";
+import { v1Router } from "./ui/v1";
+import { errorHandler } from "./ui/middlewares/error-handler";
+import { tenantContext } from "./ui/middlewares/tenant-context";
+import { authJwt } from "./ui/middlewares/auth-jwt";
+import { rbac } from "./ui/middlewares/rbac";
+import { rateLimiter } from "./ui/middlewares/rate-limiter";
+
+export function createServer() {
+  const app = express();
+  const logger = pino({ name: "mag-api", level: process.env.LOG_LEVEL || "info" });
+
+  // Segurança + performance
+  app.use(helmet());
+  app.use(cors());
+  app.use(compression());
+  app.use(express.json({ limit: "1mb" }));
+
+  // Logging estruturado (condicional)
+  if (process.env.ENABLE_REQUEST_LOGGING === "true") {
+    app.use(pinoHttp({ logger }));
+  }
+
+  // Contexto de Tenant + Auth + RBAC
+  app.use(tenantContext());
+  app.use(authJwt({ optional: true })); // por enquanto opcional
+  app.use(rbac({ optional: true }));
+
+  // Rate limiting (condicional)
+  if (process.env.ENABLE_RATE_LIMITING === "true") {
+    app.use(rateLimiter());
+  }
+
+  // Internal
+  registerMetrics(app);
+  app.use("/internal/health", healthRouter());
+  app.use("/internal/metrics", metricsRouter());
+
+  // API v1 (contratos estáveis)
+  app.use("/api/v1", v1Router());
+
+  // Error handler (sempre o último)
+  app.use(errorHandler(logger));
+
+  return app;
+}

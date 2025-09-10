@@ -1,0 +1,76 @@
+version: "3.9"
+services:
+  api:
+    image: node:20
+    container_name: mag_api
+    working_dir: /app
+    command: ["bash","-lc","node -e \"console.log('API placeholder - contracts ready')\""]
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/mag
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=redpanda:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - JWT_SECRET=changeme
+    depends_on: [postgres, redis, redpanda, schema-registry]
+    networks: [mag]
+
+  events-gateway:
+    image: node:20
+    container_name: mag_gateway
+    working_dir: /app
+    command: ["bash","-lc","node -e \"console.log('Gateway placeholder - topics wired')\""]
+    environment:
+      - KAFKA_BROKERS=redpanda:9092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+    depends_on: [redpanda, schema-registry]
+    networks: [mag]
+
+  web:
+    image: node:20
+    container_name: mag_web
+    working_dir: /app
+    command: ["bash","-lc","node -e \"console.log('Web placeholder - pages wired to topics')\""]
+    environment:
+      - API_BASE_URL=http://api:3000/api/v1
+      - REALTIME_URL=http://events-gateway:8080
+    depends_on: [api, events-gateway]
+    networks: [mag]
+
+  postgres:
+    image: postgres:15
+    container_name: mag_postgres
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mag
+    ports:
+      - "5432:5432"
+    networks: [mag]
+
+  redis:
+    image: redis:7
+    container_name: mag_redis
+    ports:
+      - "6379:6379"
+    networks: [mag]
+
+  redpanda:
+    image: redpandadata/redpanda:v23.3.15
+    container_name: mag_redpanda
+    command: ["redpanda","start","--overprovisioned","--smp","1","--memory","1G","--reserve-memory","0M","--node-id","0","--check=false"]
+    ports:
+      - "9092:9092"
+    networks: [mag]
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: mag_schema_registry
+    environment:
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=PLAINTEXT://redpanda:9092
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+    depends_on: [redpanda]
+    ports:
+      - "8081:8081"
+    networks: [mag]
+
+networks:
+  mag: {}

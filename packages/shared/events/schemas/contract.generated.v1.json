@@ -1,0 +1,21 @@
+{
+  "title": "contract.generated.v1",
+  "type": "object",
+  "properties": {
+    "contractId": {
+      "type": "string"
+    },
+    "docId": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": [
+    "contractId",
+    "docId",
+    "url"
+  ]
+}

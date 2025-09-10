@@ -1,0 +1,154 @@
+{
+  "Timestamp": "2025-09-10 09:18:05",
+  "ProjectInfo": {
+    "Name": "mag-webapp-v8",
+    "Version": null,
+    "Description": null,
+    "NodeVersion": "22.13.0",
+    "NpmVersion": "10.9.2",
+    "Author": null,
+    "License": null,
+    "Scripts": "{\"dev\":\"nodemon mag-webapp-v8-integrated/apps/api/src/index.js\",\"lint\":\"eslint .\",\"format\":\"prettier --write .\",\"test\":\"jest\",\"coverage\":\"nyc npm test\",\"docs:openapi\":\"node scripts/generate-openapi.cjs\",\"docs:jsdoc\":\"jsdoc -c jsdoc.json\",\"audit:deps\":\"npm audit\",\"audit:licenses\":\"npx license-checker --production --json\",\"load\":\"artillery run load_test.yml\",\"audit\":\"npm run lint && npm test\",\"audit:node\":\"pwsh -File ./scripts/audit-node.ps1 -GenerateHTML\",\"audit:api\":\"pwsh -File ./scripts/audit-node.ps1 -ProjectPath ./apps/api -GenerateHTML -OutputPath ./apps/api/audit-reports\"}",
+    "Dependencies": 1,
+    "DevDependencies": 17
+  },
+  "Security": {
+    "SensitiveFiles": [],
+    "Vulnerabilities": {
+      "Critical": 0,
+      "High": 0,
+      "Moderate": 5,
+      "Low": 2,
+      "Info": 0,
+      "Total": 7
+    }
+  },
+  "Quality": {
+    "CodeMetrics": {
+      "TotalFiles": 38,
+      "TotalLines": 1872,
+      "AverageFileSize": 49.26
+    }
+  },
+  "Dependencies": {
+    "Unused": {
+      "Dependencies": [
+        "express"
+      ],
+      "DevDependencies": [
+        "depcheck",
+        "eslint-config-prettier",
+        "supertest",
+        "swagger-jsdoc",
+        "swagger-ui-express"
+      ],
+      "Count": 6
+    },
+    "Outdated": {
+      "Count": 14,
+      "Packages": [
+        {
+          "Name": "@prisma/client",
+          "Current": "5.19.1",
+          "Wanted": "5.22.0",
+          "Latest": "6.16.0"
+        },
+        {
+          "Name": "@types/express",
+          "Current": "4.17.23",
+          "Wanted": "4.17.23",
+          "Latest": "5.0.3"
+        },
+        {
+          "Name": "@types/node",
+          "Current": "20.19.13",
+          "Wanted": "20.19.13",
+          "Latest": "24.3.1"
+        },
+        {
+          "Name": "@typescript-eslint/eslint-plugin",
+          "Current": "8.42.0",
+          "Wanted": "8.43.0",
+          "Latest": "8.43.0"
+        },
+        {
+          "Name": "@typescript-eslint/parser",
+          "Current": "8.42.0",
+          "Wanted": "8.43.0",
+          "Latest": "8.43.0"
+        },
+        {
+          "Name": "bcryptjs",
+          "Current": "2.4.3",
+          "Wanted": "2.4.3",
+          "Latest": "3.0.2"
+        },
+        {
+          "Name": "dotenv",
+          "Current": "16.6.1",
+          "Wanted": "16.6.1",
+          "Latest": "17.2.2"
+        },
+        {
+          "Name": "express",
+          "Current": "4.21.2",
+          "Wanted": "4.21.2",
+          "Latest": "5.1.0"
+        },
+        {
+          "Name": "express-rate-limit",
+          "Current": "7.5.1",
+          "Wanted": "7.5.1",
+          "Latest": "8.1.0"
+        },
+        {
+          "Name": "helmet",
+          "Current": "7.2.0",
+          "Wanted": "7.2.0",
+          "Latest": "8.1.0"
+        },
+        {
+          "Name": "prisma",
+          "Current": "5.19.1",
+          "Wanted": "5.22.0",
+          "Latest": "6.16.0"
+        },
+        {
+          "Name": "uuid",
+          "Current": "9.0.1",
+          "Wanted": "9.0.1",
+          "Latest": "13.0.0"
+        },
+        {
+          "Name": "vitest",
+          "Current": "2.1.9",
+          "Wanted": "2.1.9",
+          "Latest": "3.2.4"
+        },
+        {
+          "Name": "zod",
+          "Current": "3.25.76",
+          "Wanted": "3.25.76",
+          "Latest": "4.1.5"
+        }
+      ]
+    },
+    "Licenses": "Ôö£ÔöÇ MIT: 959\nÔö£ÔöÇ Apache-2.0: 166\nÔö£ÔöÇ ISC: 92\nÔö£ÔöÇ BSD-3-Clause: 41\nÔö£ÔöÇ BSD-2-Clause: 24\nÔö£ÔöÇ MPL-2.0: 11\nÔö£ÔöÇ UNKNOWN: 4\nÔö£ÔöÇ BlueOak-1.0.0: 3\nÔö£ÔöÇ 0BSD: 2\nÔö£ÔöÇ (MIT OR CC0-1.0): 2\nÔö£ÔöÇ UNLICENSED: 1\nÔö£ÔöÇ Python-2.0: 1\nÔö£ÔöÇ Custom: https://circleci.com/gh/artilleryio/artillery-plugin-expect/tree/master.svg: 1\nÔö£ÔöÇ MIT*: 1\nÔö£ÔöÇ CC-BY-4.0: 1\nÔö£ÔöÇ Unlicense: 1\nÔö£ÔöÇ (BSD-2-Clause OR MIT OR Apache-2.0): 1\nÔö£ÔöÇ CC-BY-3.0: 1\nÔö£ÔöÇ CC0-1.0: 1\nÔö£ÔöÇ (MIT AND CC-BY-3.0): 1\nÔööÔöÇ WTFPL: 1\n\n"
+  },
+  "Tests": {
+    "Success": false
+  },
+  "Performance": {
+    "OptimizationScripts": [],
+    "Suggestions": [
+      "Configure scripts de build/otimização no package.json."
+    ],
+    "NodeModulesSize": 436.78
+  },
+  "Summary": {
+    "EndTime": "2025-09-10 09:19:43",
+    "Grade": "B",
+    "Duration": "01:38",
+    "Score": 80
+  }
+}

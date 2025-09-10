@@ -1,0 +1,1878 @@
+param(
+    [string]$ProjectPath = (Get-Location),
+    [switch]$SkipSecurity,
+    [switch]$SkipQuality,
+    [switch]$SkipDependencies,
+    [switch]$SkipTests,
+    [switch]$SkipPerformance,
+    [switch]$GenerateHTML,
+    [string]$OutputPath = ".\audit-reports"
+)
+
+# ---------- Util ----------
+$Colors = @{
+    Success = 'Green'
+    Error   = 'Red'
+    Warning = 'Yellow'
+    Info    = 'Cyan'
+    Header  = 'Magenta'
+}
+
+function Write-Log([string]$Message, [string]$Color = "White", [string]$Symbol = ">") {
+    Write-Host "$Symbol $Message" -ForegroundColor $Color
+}
+
+function Write-Header([string]$Title) {
+    Write-Host ""
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+    Write-Host "  $Title" -ForegroundColor $Colors.Header
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+}
+
+function Exec([string]$Command, [string]$Desc) {
+    Write-Log $Desc $Colors.Info "..."
+    $r = [ordered]@{ Success = $false; Output = ""; Error = ""; ExitCode = -1 }
+    try {
+        $isWin = $env:OS -match 'Windows'
+        $file = $isWin ? "cmd.exe" : "/bin/bash"
+        $args = $isWin ? "/c $Command" : "-lc ""$Command"""
+
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $file
+        $psi.Arguments = $args
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.WorkingDirectory = $ProjectPath
+
+        $p = [System.Diagnostics.Process]::new()
+        $p.StartInfo = $psi
+        $p.Start() | Out-Null
+        $out = $p.StandardOutput.ReadToEnd()
+        $err = $p.StandardError.ReadToEnd()
+        $p.WaitForExit()
+
+        $r.Output   = $out
+        $r.Error    = $err
+        $r.ExitCode = $p.ExitCode
+        $r.Success  = ($p.ExitCode -eq 0)
+    } catch {
+        $r.Error = $_.Exception.Message
+        Write-Log "Erro ao executar: $_" $Colors.Error "X"
+    }
+    return $r
+}
+
+# ---------- Estado ----------
+$Results = [ordered]@{
+    Timestamp    = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    ProjectInfo  = @{}
+    Security     = @{}
+    Quality      = @{}
+    Dependencies = @{}
+    Tests        = @{}
+    Performance  = @{}
+    Summary      = @{}
+}
+$StartTime = Get-Date
+$PackageJson = $null
+
+# ---------- Funções ----------
+function Ensure-OutputDir {
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+}
+
+function Get-ProjectInfo {
+    Write-Header "INFORMAÇÕES DO PROJETO"
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado!" $Colors.Error "X"
+        throw "Não é um projeto Node.js válido"
+    }
+    try {
+        $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+        $script:PackageJson = $pkg
+
+        $depsCount    = 0
+        $devDepsCount = 0
+        if ($pkg -and $pkg.PSObject.Properties['dependencies'])    { $depsCount    = @($pkg.dependencies.PSObject.Properties).Count }
+        if ($pkg -and $pkg.PSObject.Properties['devDependencies']) { $devDepsCount = @($pkg.devDependencies.PSObject.Properties).Count }
+
+        $Results.ProjectInfo = [ordered]@{
+            Name            = $pkg.name
+            Version         = $pkg.version
+            Description     = $pkg.description
+            NodeVersion     = ((node --version 2>$null) -replace '^v','')
+            NpmVersion      = (npm --version 2>$null)
+            Author          = $pkg.author
+            License         = $pkg.license
+            Scripts         = ($pkg.scripts | ConvertTo-Json -Compress)
+            Dependencies    = $depsCount
+            DevDependencies = $devDepsCount
+        }
+
+        Write-Log "Projeto: $($pkg.name) v$($pkg.version)" $Colors.Success "+"
+        Write-Log "Node.js: $($Results.ProjectInfo.NodeVersion)" $Colors.Info
+        Write-Log "NPM:     $($Results.ProjectInfo.NpmVersion)"  $Colors.Info
+        Write-Log "Deps: $depsCount | DevDeps: $devDepsCount"    $Colors.Info
+    } catch {
+        Write-Log "Erro ao ler package.json: $_" $Colors.Error "X"
+    }
+}
+
+function Audit-Security {
+    Write-Header "AUDITORIA DE SEGURANÇA"
+
+    $audit = Exec "npm audit --json" "Verificando vulnerabilidades (npm audit)"
+    $crit=0;$high=0;$mod=0;$low=0;$info=0;$total=0
+    if ($audit.Output) {
+        try {
+            $json = $audit.Output | ConvertFrom-Json
+            if ($json -and $json.PSObject.Properties['metadata']) {
+                $md = $json.metadata
+                if ($md -and $md.PSObject.Properties['vulnerabilities']) {
+                    $v = $md.vulnerabilities
+                    if ($v.PSObject.Properties['critical']) { $crit = [int]$v.critical }
+                    if ($v.PSObject.Properties['high'])     { $high = [int]$v.high }
+                    if ($v.PSObject.Properties['moderate']) { $mod  = [int]$v.moderate }
+                    if ($v.PSObject.Properties['low'])      { $low  = [int]$v.low }
+                    if ($v.PSObject.Properties['info'])     { $info = [int]$v.info }
+                    if ($v.PSObject.Properties['total'])    { $total= [int]$v.total } else { $total = $crit+$high+$mod+$low+$info }
+                }
+            }
+        } catch {
+            Write-Log "Falha ao interpretar npm audit (prosseguindo mesmo assim)." $Colors.Warning "!"
+        }
+    }
+    $Results.Security.Vulnerabilities = [ordered]@{
+        Critical=$crit; High=$high; Moderate=$mod; Low=$low; Info=$info; Total=$total
+    }
+
+    if ($total -eq 0) {
+        Write-Log "Nenhuma vulnerabilidade encontrada." $Colors.Success "+"
+    } else {
+        Write-Log "Críticas: $crit | Altas: $high | Médias: $mod | Baixas: $low | Info: $info" $Colors.Warning "!"
+        $fix = Exec "npm audit fix" "Tentando corrigir automaticamente (npm audit fix)"
+        if ($fix.Success) { Write-Log "Correções aplicadas." $Colors.Success "+" }
+    }
+
+    # Arquivos sensíveis
+    Write-Log "Verificando arquivos sensíveis" $Colors.Info "..."
+    $sensitive = @(".env",".env.local",".env.production","config.json","secrets.json")
+    $found = @()
+    foreach ($f in $sensitive) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $found += $f
+            $gi = Join-Path $ProjectPath ".gitignore"
+            if (Test-Path $gi) {
+                $giContent = Get-Content $gi -Raw
+                if ($giContent -notmatch [regex]::Escape($f)) {
+                    Write-Log "ALERTA: $f não está no .gitignore" $Colors.Error "!"
+                }
+            }
+        }
+    }
+    $Results.Security.SensitiveFiles = $found
+    if ($found.Count -gt 0) { Write-Log ("Arquivos sensíveis: " + ($found -join ", ")) $Colors.Warning "!" }
+}
+
+function Audit-Quality {
+    Write-Header "QUALIDADE DO CÓDIGO"
+
+    # ESLint (detecta config)
+    $eslintConfigs = @(".eslintrc",".eslintrc.json",".eslintrc.js",".eslintrc.cjs",".eslintrc.yaml",".eslintrc.yml",".eslintrc.mjs", "eslint.config.js","eslint.config.cjs", "eslint.config.mjs") |
+        ForEach-Object { Join-Path $ProjectPath $_ } | Where-Object { Test-Path $_ }
+
+    $hasPkgEslint = $false
+    if ($PackageJson -and $PackageJson.PSObject.Properties['eslintConfig']) { $hasPkgEslint = $true }
+
+    if ($true) {
+        $eslint = Exec "npx eslint . --format json" "Executando ESLint"
+        if ($eslint.Output) {
+            try {
+                $e = $eslint.Output | ConvertFrom-Json
+                $err = ($e | ForEach-Object { $_.errorCount } | Measure-Object -Sum).Sum
+                $warn= ($e | ForEach-Object { $_.warningCount } | Measure-Object -Sum).Sum
+                $files = $e.Count
+                $Results.Quality.ESLint = [ordered]@{ Errors=$err; Warnings=$warn; FilesAnalyzed=$files }
+                Write-Log "ESLint: Erros=$err | Avisos=$warn | Arquivos=$files" $Colors.Info
+            } catch {
+                Write-Log "ESLint executado, mas não foi possível ler JSON. Supondo sem problemas críticos." $Colors.Success "+"
+            }
+        }
+    } else {
+        Write-Log "ESLint não configurado" $Colors.Warning "!"
+    }
+
+    # Métricas simples (JS/TS/JSX/TSX)
+    $files = Get-ChildItem -Path $ProjectPath -Recurse -File -Include *.js,*.jsx,*.ts,*.tsx -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|dist|build)[\\/]' }
+    $total = $files.Count
+    $lines = 0
+    foreach ($f in $files) {
+        $lines += (Get-Content $f.FullName -ErrorAction SilentlyContinue | Measure-Object -Line).Lines
+    }
+    $avg = 0
+    if ($total -gt 0) { $avg = [math]::Round($lines / $total, 2) }
+    $Results.Quality.CodeMetrics = [ordered]@{ TotalFiles=$total; TotalLines=$lines; AverageFileSize=$avg }
+    Write-Log "Arquivos=$total | Linhas=$lines | Média por arquivo=$avg" $Colors.Info
+}
+
+function Audit-Dependencies {
+    Write-Header "DEPENDÊNCIAS"
+
+    $out = Exec "npm outdated --json" "Verificando desatualizações"
+    $count=0;$list=@()
+    if ($out.Output) {
+        try {
+            $j = $out.Output | ConvertFrom-Json
+            if ($j) {
+                $props = $j | Get-Member -MemberType NoteProperty
+                $count = $props.Count
+                foreach ($p in $props) {
+                    $item = $j.($p.Name)
+                    $list += [ordered]@{ Name=$p.Name; Current=$item.current; Wanted=$item.wanted; Latest=$item.latest }
+                }
+            }
+        } catch {
+            # nada
+        }
+    }
+    $Results.Dependencies.Outdated = [ordered]@{ Count=$count; Packages=$list }
+    if ($count -gt 0) {
+        Write-Log "Dependências desatualizadas: $count" $Colors.Warning "!"
+        foreach ($pkg in $list) {
+            Write-Log "  $($pkg.Name): $($pkg.Current) -> $($pkg.Wanted) (latest: $($pkg.Latest))" $Colors.Warning " "
+        }
+    } else {
+        Write-Log "Todas as dependências estão atualizadas." $Colors.Success "+"
+    }
+
+    $dep = Exec "npx depcheck apps/api --json" "Verificando dependências não utilizadas"
+    $unused=@(); $unusedDev=@()
+    if ($dep.Output) {
+        try {
+            $dj = $dep.Output | ConvertFrom-Json
+            if ($dj -and $dj.PSObject.Properties['dependencies'])    { $unused    = @($dj.dependencies) }
+            if ($dj -and $dj.PSObject.Properties['devDependencies']) { $unusedDev = @($dj.devDependencies) }
+        } catch {}
+    }
+    $unusedCount = ($unused.Count + $unusedDev.Count)
+    $Results.Dependencies.Unused = [ordered]@{ Dependencies=$unused; DevDependencies=$unusedDev; Count=$unusedCount }
+    if ($unusedCount -gt 0) {
+        if ($unused.Count -gt 0)   { Write-Log ("Dependências não usadas: " + ($unused -join ", ")) $Colors.Warning "!" }
+        if ($unusedDev.Count -gt 0){ Write-Log ("DevDeps não usados: " + ($unusedDev -join ", ")) $Colors.Warning "!" }
+    } else {
+        Write-Log "Todas as dependências estão sendo utilizadas." $Colors.Success "+"
+    }
+
+    $lic = Exec "npx license-checker --summary" "Analisando licenças"
+    if ($lic.Output) {
+        $Results.Dependencies.Licenses = $lic.Output
+        Write-Log "Análise de licenças concluída." $Colors.Success "+"
+    }
+}
+
+function Audit-Tests {
+    Write-Header "TESTES"
+    $pkg = $script:PackageJson
+    if (-not $pkg) {
+        $pkgPath = Join-Path $ProjectPath "package.json"
+        try { $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json } catch {}
+    }
+    if ($pkg -and $pkg.PSObject.Properties['scripts'] -and $pkg.scripts -and $pkg.scripts.PSObject.Properties['test']) {
+        Write-Log "Executando testes (npm test)" $Colors.Info "..."
+        $cmd = "npm test"
+        if ($pkg.scripts.test -match "jest")  { $cmd = "npm test -- --coverage --json --outputFile=test-results.json" }
+        if ($pkg.scripts.test -match "mocha") { $cmd = "npm test -- --reporter json > test-results.json" }
+
+        $tr = Exec $cmd "Rodando suite de testes"
+        $res = [ordered]@{}
+        $jsonPath = Join-Path $ProjectPath "test-results.json"
+        if (Test-Path $jsonPath) {
+            try {
+                $tj = Get-Content $jsonPath -Raw | ConvertFrom-Json
+                if ($tj.PSObject.Properties['success'])       { $res.Success     = $tj.success }
+                if ($tj.PSObject.Properties['numTotalTests']) { $res.TotalTests  = $tj.numTotalTests }
+                if ($tj.PSObject.Properties['numPassedTests']){ $res.PassedTests = $tj.numPassedTests }
+                if ($tj.PSObject.Properties['numFailedTests']){ $res.FailedTests = $tj.numFailedTests }
+                $res.Coverage = (if ($tj.PSObject.Properties['coverageMap']) { "Disponível" } else { "Não disponível" })
+                Remove-Item $jsonPath -Force -ErrorAction SilentlyContinue
+            } catch {
+                Write-Log "Testes executados (sem JSON parseável)" $Colors.Warning "!"
+            }
+        } else {
+            $res.Success = $tr.Success
+        }
+        $Results.Tests = $res
+
+        # cobertura do Jest (coverage-summary.json)
+        $covDir = Join-Path $ProjectPath "coverage"
+        if (Test-Path $covDir) {
+            $sum = Join-Path $covDir "coverage-summary.json"
+            if (Test-Path $sum) {
+                try {
+                    $sj = Get-Content $sum -Raw | ConvertFrom-Json
+                    if ($sj -and $sj.PSObject.Properties['total'] -and $sj.total.PSObject.Properties['lines']) {
+                        $pct = $sj.total.lines.pct
+                        $Results.Tests.CoveragePercent = $pct
+                        Write-Log "Cobertura de linhas: $pct%" $Colors.Success "+"
+                    }
+                } catch {}
+            }
+        }
+    } else {
+        Write-Log "Nenhum script de teste configurado" $Colors.Warning "!"
+        $Results.Tests.Message = "Nenhum teste configurado"
+    }
+}
+
+function Audit-Performance {
+    Write-Header "PERFORMANCE"
+    Write-Log "Calculando tamanhos..." $Colors.Info "..."
+
+    $nm = Join-Path $ProjectPath "node_modules"
+    if (Test-Path $nm) {
+        try {
+            $mb = (Get-ChildItem $nm -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+            $mb = [math]::Round($mb,2)
+            $Results.Performance.NodeModulesSize = $mb
+            Write-Log "node_modules: $mb MB" ($mb -gt 500 ? $Colors.Warning : $Colors.Info)
+        } catch {
+            Write-Log "Falha ao medir node_modules (ignorado)" $Colors.Warning "!"
+        }
+    }
+
+    foreach ($f in @("dist","build","public")) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $kb = (Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1KB
+            $kb = [math]::Round($kb,2)
+            $Results.Performance["$($f)Size"] = $kb
+            Write-Log ("$f`: {0} KB" -f $kb) $Colors.Info
+        }
+    }
+
+    $found = @()
+    if ($PackageJson -and $PackageJson.PSObject.Properties['scripts']) {
+        foreach ($s in @("build","build:prod","optimize","minify")) {
+            if ($PackageJson.scripts.PSObject.Properties[$s]) { $found += $s }
+        }
+    }
+    $Results.Performance.OptimizationScripts = $found
+    if ($found.Count -gt 0) { Write-Log ("Scripts de otimização: " + ($found -join ", ")) $Colors.Success "+" }
+    else { Write-Log "Nenhum script de otimização encontrado" $Colors.Warning "!" }
+
+    $sug = @()
+    if (($Results.Performance.NodeModulesSize -as [double]) -gt 500) { $sug += "Use 'npm prune' para remover pacotes não utilizados." }
+    if ($found.Count -eq 0) { $sug += "Configure scripts de build/otimização no package.json." }
+    $Results.Performance.Suggestions = $sug
+    if ($sug.Count -gt 0) {
+        Write-Log "Sugestões:" $Colors.Info "-"
+        foreach ($x in $sug) { Write-Log "  - $x" $Colors.Warning " " }
+    }
+}
+
+function Generate-Report {
+    Write-Header "RELATÓRIOS"
+    $end = Get-Date
+    $dur = $end - $StartTime
+    $Results.Summary.Duration = $dur.ToString("mm\:ss")
+    $Results.Summary.EndTime  = $end.ToString("yyyy-MM-dd HH:mm:ss")
+
+    $score = 100
+    $sec = $Results.Security.Vulnerabilities
+    $qlt = $Results.Quality.ESLint
+    $depOut = $Results.Dependencies.Outdated
+    $depUnused = $Results.Dependencies.Unused
+
+    $crit=0;$high=0;$mod=0
+    if ($sec) { $crit=$sec.Critical; $high=$sec.High; $mod=$sec.Moderate }
+    $err=0;$warn=0
+    if ($qlt) { $err=$qlt.Errors; $warn=$qlt.Warnings }
+    $outCount = 0; $unusedCount = 0
+    if ($depOut) { $outCount = $depOut.Count }
+    if ($depUnused) { $unusedCount = $depUnused.Count }
+
+    if ($crit -gt 0) { $score -= 20 }
+    if ($high -gt 0) { $score -= 15 }
+    if ($mod  -gt 0) { $score -= 10 }
+    if ($err  -gt 0) { $score -= 10 }
+    if ($warn -gt 10){ $score -= 5 }
+    if ($outCount -gt 10){ $score -= 5 }
+    if ($unusedCount -gt 5){ $score -= 5 }
+
+    if ($score -lt 0) { $score = 0 }
+    $Results.Summary.Score = $score
+    $grade = "F"
+    if ($score -ge 90) { $grade = "A" }
+    elseif ($score -ge 80) { $grade = "B" }
+    elseif ($score -ge 70) { $grade = "C" }
+    elseif ($score -ge 60) { $grade = "D" }
+    $Results.Summary.Grade = $grade
+
+    Ensure-OutputDir
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $jsonPath = Join-Path $OutputPath "audit-report-$stamp.json"
+    $txtPath  = Join-Path $OutputPath "audit-report-$stamp.txt"
+
+    ($Results | ConvertTo-Json -Depth 10) | Out-File $jsonPath -Encoding UTF8
+    (Get-TextReport) | Out-File $txtPath -Encoding UTF8
+    Write-Log "JSON: $jsonPath" $Colors.Success "+"
+    Write-Log "TXT : $txtPath"  $Colors.Success "+"
+}
+
+function Get-TextReport {
+@"
+================================================================================
+                         RELATÓRIO DE AUDITORIA NODE.JS
+================================================================================
+Data: $($Results.Timestamp)
+Duração: $($Results.Summary.Duration)
+
+--- PROJETO ---
+Nome: $($Results.ProjectInfo.Name)
+Versão: $($Results.ProjectInfo.Version)
+Descrição: $($Results.ProjectInfo.Description)
+Node.js: $($Results.ProjectInfo.NodeVersion)
+NPM: $($Results.ProjectInfo.NpmVersion)
+Dependências: $($Results.ProjectInfo.Dependencies)
+DevDependências: $($Results.ProjectInfo.DevDependencies)
+
+--- SEGURANÇA ---
+Críticas: $($Results.Security.Vulnerabilities.Critical)
+Altas:    $($Results.Security.Vulnerabilities.High)
+Médias:   $($Results.Security.Vulnerabilities.Moderate)
+Baixas:   $($Results.Security.Vulnerabilities.Low)
+Total:    $($Results.Security.Vulnerabilities.Total)
+Sensíveis: $((($Results.Security.SensitiveFiles) -join ', '))
+
+--- QUALIDADE ---
+ESLint: Erros=$($Results.Quality.ESLint.Errors) | Avisos=$($Results.Quality.ESLint.Warnings) | Arquivos=$($Results.Quality.ESLint.FilesAnalyzed)
+Métricas: Arquivos=$($Results.Quality.CodeMetrics.TotalFiles) | Linhas=$($Results.Quality.CodeMetrics.TotalLines) | Média=$($Results.Quality.CodeMetrics.AverageFileSize)
+
+--- DEPENDÊNCIAS ---
+Desatualizadas: $($Results.Dependencies.Outdated.Count)
+Não Utilizadas: $($Results.Dependencies.Unused.Count)
+
+--- TESTES ---
+$(
+    if ($Results.Tests.TotalTests) {
+        "Total=$($Results.Tests.TotalTests) | Passou=$($Results.Tests.PassedTests) | Falhou=$($Results.Tests.FailedTests) | Cobertura=$($Results.Tests.CoveragePercent)%"
+    } else {
+        $Results.Tests.Message
+    }
+)
+
+--- PERFORMANCE ---
+node_modules: $($Results.Performance.NodeModulesSize) MB
+Tamanhos de build:
+$(
+    ($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+    ForEach-Object { "  - {0}: {1} KB" -f ($_.Name -replace 'Size$',''), $_.Value }) -join "`r`n"
+)
+Scripts: $($Results.Performance.OptimizationScripts -join ', ')
+Sugestões:
+$(if ($Results.Performance.Suggestions.Count -gt 0) {
+  "<h3>💡 Sugestões de Otimização:</h3><ul>" +
+  ((@($Results.Performance.Suggestions | ForEach-Object { "<li>$(param(
+    [string]$ProjectPath = (Get-Location),
+    [switch]$SkipSecurity,
+    [switch]$SkipQuality,
+    [switch]$SkipDependencies,
+    [switch]$SkipTests,
+    [switch]$SkipPerformance,
+    [switch]$GenerateHTML,
+    [string]$OutputPath = ".\audit-reports"
+)
+
+# ---------- Util ----------
+$Colors = @{
+    Success = 'Green'
+    Error   = 'Red'
+    Warning = 'Yellow'
+    Info    = 'Cyan'
+    Header  = 'Magenta'
+}
+
+function Write-Log([string]$Message, [string]$Color = "White", [string]$Symbol = ">") {
+    Write-Host "$Symbol $Message" -ForegroundColor $Color
+}
+
+function Write-Header([string]$Title) {
+    Write-Host ""
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+    Write-Host "  $Title" -ForegroundColor $Colors.Header
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+}
+
+function Exec([string]$Command, [string]$Desc) {
+    Write-Log $Desc $Colors.Info "..."
+    $r = [ordered]@{ Success = $false; Output = ""; Error = ""; ExitCode = -1 }
+    try {
+        $isWin = $env:OS -match 'Windows'
+        $file = $isWin ? "cmd.exe" : "/bin/bash"
+        $args = $isWin ? "/c $Command" : "-lc ""$Command"""
+
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $file
+        $psi.Arguments = $args
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.WorkingDirectory = $ProjectPath
+
+        $p = [System.Diagnostics.Process]::new()
+        $p.StartInfo = $psi
+        $p.Start() | Out-Null
+        $out = $p.StandardOutput.ReadToEnd()
+        $err = $p.StandardError.ReadToEnd()
+        $p.WaitForExit()
+
+        $r.Output   = $out
+        $r.Error    = $err
+        $r.ExitCode = $p.ExitCode
+        $r.Success  = ($p.ExitCode -eq 0)
+    } catch {
+        $r.Error = $_.Exception.Message
+        Write-Log "Erro ao executar: $_" $Colors.Error "X"
+    }
+    return $r
+}
+
+# ---------- Estado ----------
+$Results = [ordered]@{
+    Timestamp    = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    ProjectInfo  = @{}
+    Security     = @{}
+    Quality      = @{}
+    Dependencies = @{}
+    Tests        = @{}
+    Performance  = @{}
+    Summary      = @{}
+}
+$StartTime = Get-Date
+$PackageJson = $null
+
+# ---------- Funções ----------
+function Ensure-OutputDir {
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+}
+
+function Get-ProjectInfo {
+    Write-Header "INFORMAÇÕES DO PROJETO"
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado!" $Colors.Error "X"
+        throw "Não é um projeto Node.js válido"
+    }
+    try {
+        $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+        $script:PackageJson = $pkg
+
+        $depsCount    = 0
+        $devDepsCount = 0
+        if ($pkg -and $pkg.PSObject.Properties['dependencies'])    { $depsCount    = @($pkg.dependencies.PSObject.Properties).Count }
+        if ($pkg -and $pkg.PSObject.Properties['devDependencies']) { $devDepsCount = @($pkg.devDependencies.PSObject.Properties).Count }
+
+        $Results.ProjectInfo = [ordered]@{
+            Name            = $pkg.name
+            Version         = $pkg.version
+            Description     = $pkg.description
+            NodeVersion     = ((node --version 2>$null) -replace '^v','')
+            NpmVersion      = (npm --version 2>$null)
+            Author          = $pkg.author
+            License         = $pkg.license
+            Scripts         = ($pkg.scripts | ConvertTo-Json -Compress)
+            Dependencies    = $depsCount
+            DevDependencies = $devDepsCount
+        }
+
+        Write-Log "Projeto: $($pkg.name) v$($pkg.version)" $Colors.Success "+"
+        Write-Log "Node.js: $($Results.ProjectInfo.NodeVersion)" $Colors.Info
+        Write-Log "NPM:     $($Results.ProjectInfo.NpmVersion)"  $Colors.Info
+        Write-Log "Deps: $depsCount | DevDeps: $devDepsCount"    $Colors.Info
+    } catch {
+        Write-Log "Erro ao ler package.json: $_" $Colors.Error "X"
+    }
+}
+
+function Audit-Security {
+    Write-Header "AUDITORIA DE SEGURANÇA"
+
+    $audit = Exec "npm audit --json" "Verificando vulnerabilidades (npm audit)"
+    $crit=0;$high=0;$mod=0;$low=0;$info=0;$total=0
+    if ($audit.Output) {
+        try {
+            $json = $audit.Output | ConvertFrom-Json
+            if ($json -and $json.PSObject.Properties['metadata']) {
+                $md = $json.metadata
+                if ($md -and $md.PSObject.Properties['vulnerabilities']) {
+                    $v = $md.vulnerabilities
+                    if ($v.PSObject.Properties['critical']) { $crit = [int]$v.critical }
+                    if ($v.PSObject.Properties['high'])     { $high = [int]$v.high }
+                    if ($v.PSObject.Properties['moderate']) { $mod  = [int]$v.moderate }
+                    if ($v.PSObject.Properties['low'])      { $low  = [int]$v.low }
+                    if ($v.PSObject.Properties['info'])     { $info = [int]$v.info }
+                    if ($v.PSObject.Properties['total'])    { $total= [int]$v.total } else { $total = $crit+$high+$mod+$low+$info }
+                }
+            }
+        } catch {
+            Write-Log "Falha ao interpretar npm audit (prosseguindo mesmo assim)." $Colors.Warning "!"
+        }
+    }
+    $Results.Security.Vulnerabilities = [ordered]@{
+        Critical=$crit; High=$high; Moderate=$mod; Low=$low; Info=$info; Total=$total
+    }
+
+    if ($total -eq 0) {
+        Write-Log "Nenhuma vulnerabilidade encontrada." $Colors.Success "+"
+    } else {
+        Write-Log "Críticas: $crit | Altas: $high | Médias: $mod | Baixas: $low | Info: $info" $Colors.Warning "!"
+        $fix = Exec "npm audit fix" "Tentando corrigir automaticamente (npm audit fix)"
+        if ($fix.Success) { Write-Log "Correções aplicadas." $Colors.Success "+" }
+    }
+
+    # Arquivos sensíveis
+    Write-Log "Verificando arquivos sensíveis" $Colors.Info "..."
+    $sensitive = @(".env",".env.local",".env.production","config.json","secrets.json")
+    $found = @()
+    foreach ($f in $sensitive) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $found += $f
+            $gi = Join-Path $ProjectPath ".gitignore"
+            if (Test-Path $gi) {
+                $giContent = Get-Content $gi -Raw
+                if ($giContent -notmatch [regex]::Escape($f)) {
+                    Write-Log "ALERTA: $f não está no .gitignore" $Colors.Error "!"
+                }
+            }
+        }
+    }
+    $Results.Security.SensitiveFiles = $found
+    if ($found.Count -gt 0) { Write-Log ("Arquivos sensíveis: " + ($found -join ", ")) $Colors.Warning "!" }
+}
+
+function Audit-Quality {
+    Write-Header "QUALIDADE DO CÓDIGO"
+
+    # ESLint (detecta config)
+    $eslintConfigs = @(".eslintrc",".eslintrc.json",".eslintrc.js",".eslintrc.cjs",".eslintrc.yaml",".eslintrc.yml",".eslintrc.mjs", "eslint.config.js","eslint.config.cjs", "eslint.config.mjs") |
+        ForEach-Object { Join-Path $ProjectPath $_ } | Where-Object { Test-Path $_ }
+
+    $hasPkgEslint = $false
+    if ($PackageJson -and $PackageJson.PSObject.Properties['eslintConfig']) { $hasPkgEslint = $true }
+
+    if ($true) {
+        $eslint = Exec "npx eslint . --format json" "Executando ESLint"
+        if ($eslint.Output) {
+            try {
+                $e = $eslint.Output | ConvertFrom-Json
+                $err = ($e | ForEach-Object { $_.errorCount } | Measure-Object -Sum).Sum
+                $warn= ($e | ForEach-Object { $_.warningCount } | Measure-Object -Sum).Sum
+                $files = $e.Count
+                $Results.Quality.ESLint = [ordered]@{ Errors=$err; Warnings=$warn; FilesAnalyzed=$files }
+                Write-Log "ESLint: Erros=$err | Avisos=$warn | Arquivos=$files" $Colors.Info
+            } catch {
+                Write-Log "ESLint executado, mas não foi possível ler JSON. Supondo sem problemas críticos." $Colors.Success "+"
+            }
+        }
+    } else {
+        Write-Log "ESLint não configurado" $Colors.Warning "!"
+    }
+
+    # Métricas simples (JS/TS/JSX/TSX)
+    $files = Get-ChildItem -Path $ProjectPath -Recurse -File -Include *.js,*.jsx,*.ts,*.tsx -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|dist|build)[\\/]' }
+    $total = $files.Count
+    $lines = 0
+    foreach ($f in $files) {
+        $lines += (Get-Content $f.FullName -ErrorAction SilentlyContinue | Measure-Object -Line).Lines
+    }
+    $avg = 0
+    if ($total -gt 0) { $avg = [math]::Round($lines / $total, 2) }
+    $Results.Quality.CodeMetrics = [ordered]@{ TotalFiles=$total; TotalLines=$lines; AverageFileSize=$avg }
+    Write-Log "Arquivos=$total | Linhas=$lines | Média por arquivo=$avg" $Colors.Info
+}
+
+function Audit-Dependencies {
+    Write-Header "DEPENDÊNCIAS"
+
+    $out = Exec "npm outdated --json" "Verificando desatualizações"
+    $count=0;$list=@()
+    if ($out.Output) {
+        try {
+            $j = $out.Output | ConvertFrom-Json
+            if ($j) {
+                $props = $j | Get-Member -MemberType NoteProperty
+                $count = $props.Count
+                foreach ($p in $props) {
+                    $item = $j.($p.Name)
+                    $list += [ordered]@{ Name=$p.Name; Current=$item.current; Wanted=$item.wanted; Latest=$item.latest }
+                }
+            }
+        } catch {
+            # nada
+        }
+    }
+    $Results.Dependencies.Outdated = [ordered]@{ Count=$count; Packages=$list }
+    if ($count -gt 0) {
+        Write-Log "Dependências desatualizadas: $count" $Colors.Warning "!"
+        foreach ($pkg in $list) {
+            Write-Log "  $($pkg.Name): $($pkg.Current) -> $($pkg.Wanted) (latest: $($pkg.Latest))" $Colors.Warning " "
+        }
+    } else {
+        Write-Log "Todas as dependências estão atualizadas." $Colors.Success "+"
+    }
+
+    $dep = Exec "npx depcheck apps/api --json" "Verificando dependências não utilizadas"
+    $unused=@(); $unusedDev=@()
+    if ($dep.Output) {
+        try {
+            $dj = $dep.Output | ConvertFrom-Json
+            if ($dj -and $dj.PSObject.Properties['dependencies'])    { $unused    = @($dj.dependencies) }
+            if ($dj -and $dj.PSObject.Properties['devDependencies']) { $unusedDev = @($dj.devDependencies) }
+        } catch {}
+    }
+    $unusedCount = ($unused.Count + $unusedDev.Count)
+    $Results.Dependencies.Unused = [ordered]@{ Dependencies=$unused; DevDependencies=$unusedDev; Count=$unusedCount }
+    if ($unusedCount -gt 0) {
+        if ($unused.Count -gt 0)   { Write-Log ("Dependências não usadas: " + ($unused -join ", ")) $Colors.Warning "!" }
+        if ($unusedDev.Count -gt 0){ Write-Log ("DevDeps não usados: " + ($unusedDev -join ", ")) $Colors.Warning "!" }
+    } else {
+        Write-Log "Todas as dependências estão sendo utilizadas." $Colors.Success "+"
+    }
+
+    $lic = Exec "npx license-checker --summary" "Analisando licenças"
+    if ($lic.Output) {
+        $Results.Dependencies.Licenses = $lic.Output
+        Write-Log "Análise de licenças concluída." $Colors.Success "+"
+    }
+}
+
+function Audit-Tests {
+    Write-Header "TESTES"
+    $pkg = $script:PackageJson
+    if (-not $pkg) {
+        $pkgPath = Join-Path $ProjectPath "package.json"
+        try { $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json } catch {}
+    }
+    if ($pkg -and $pkg.PSObject.Properties['scripts'] -and $pkg.scripts -and $pkg.scripts.PSObject.Properties['test']) {
+        Write-Log "Executando testes (npm test)" $Colors.Info "..."
+        $cmd = "npm test"
+        if ($pkg.scripts.test -match "jest")  { $cmd = "npm test -- --coverage --json --outputFile=test-results.json" }
+        if ($pkg.scripts.test -match "mocha") { $cmd = "npm test -- --reporter json > test-results.json" }
+
+        $tr = Exec $cmd "Rodando suite de testes"
+        $res = [ordered]@{}
+        $jsonPath = Join-Path $ProjectPath "test-results.json"
+        if (Test-Path $jsonPath) {
+            try {
+                $tj = Get-Content $jsonPath -Raw | ConvertFrom-Json
+                if ($tj.PSObject.Properties['success'])       { $res.Success     = $tj.success }
+                if ($tj.PSObject.Properties['numTotalTests']) { $res.TotalTests  = $tj.numTotalTests }
+                if ($tj.PSObject.Properties['numPassedTests']){ $res.PassedTests = $tj.numPassedTests }
+                if ($tj.PSObject.Properties['numFailedTests']){ $res.FailedTests = $tj.numFailedTests }
+                $res.Coverage = (if ($tj.PSObject.Properties['coverageMap']) { "Disponível" } else { "Não disponível" })
+                Remove-Item $jsonPath -Force -ErrorAction SilentlyContinue
+            } catch {
+                Write-Log "Testes executados (sem JSON parseável)" $Colors.Warning "!"
+            }
+        } else {
+            $res.Success = $tr.Success
+        }
+        $Results.Tests = $res
+
+        # cobertura do Jest (coverage-summary.json)
+        $covDir = Join-Path $ProjectPath "coverage"
+        if (Test-Path $covDir) {
+            $sum = Join-Path $covDir "coverage-summary.json"
+            if (Test-Path $sum) {
+                try {
+                    $sj = Get-Content $sum -Raw | ConvertFrom-Json
+                    if ($sj -and $sj.PSObject.Properties['total'] -and $sj.total.PSObject.Properties['lines']) {
+                        $pct = $sj.total.lines.pct
+                        $Results.Tests.CoveragePercent = $pct
+                        Write-Log "Cobertura de linhas: $pct%" $Colors.Success "+"
+                    }
+                } catch {}
+            }
+        }
+    } else {
+        Write-Log "Nenhum script de teste configurado" $Colors.Warning "!"
+        $Results.Tests.Message = "Nenhum teste configurado"
+    }
+}
+
+function Audit-Performance {
+    Write-Header "PERFORMANCE"
+    Write-Log "Calculando tamanhos..." $Colors.Info "..."
+
+    $nm = Join-Path $ProjectPath "node_modules"
+    if (Test-Path $nm) {
+        try {
+            $mb = (Get-ChildItem $nm -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+            $mb = [math]::Round($mb,2)
+            $Results.Performance.NodeModulesSize = $mb
+            Write-Log "node_modules: $mb MB" ($mb -gt 500 ? $Colors.Warning : $Colors.Info)
+        } catch {
+            Write-Log "Falha ao medir node_modules (ignorado)" $Colors.Warning "!"
+        }
+    }
+
+    foreach ($f in @("dist","build","public")) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $kb = (Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1KB
+            $kb = [math]::Round($kb,2)
+            $Results.Performance["$($f)Size"] = $kb
+            Write-Log ("$f`: {0} KB" -f $kb) $Colors.Info
+        }
+    }
+
+    $found = @()
+    if ($PackageJson -and $PackageJson.PSObject.Properties['scripts']) {
+        foreach ($s in @("build","build:prod","optimize","minify")) {
+            if ($PackageJson.scripts.PSObject.Properties[$s]) { $found += $s }
+        }
+    }
+    $Results.Performance.OptimizationScripts = $found
+    if ($found.Count -gt 0) { Write-Log ("Scripts de otimização: " + ($found -join ", ")) $Colors.Success "+" }
+    else { Write-Log "Nenhum script de otimização encontrado" $Colors.Warning "!" }
+
+    $sug = @()
+    if (($Results.Performance.NodeModulesSize -as [double]) -gt 500) { $sug += "Use 'npm prune' para remover pacotes não utilizados." }
+    if ($found.Count -eq 0) { $sug += "Configure scripts de build/otimização no package.json." }
+    $Results.Performance.Suggestions = $sug
+    if ($sug.Count -gt 0) {
+        Write-Log "Sugestões:" $Colors.Info "-"
+        foreach ($x in $sug) { Write-Log "  - $x" $Colors.Warning " " }
+    }
+}
+
+function Generate-Report {
+    Write-Header "RELATÓRIOS"
+    $end = Get-Date
+    $dur = $end - $StartTime
+    $Results.Summary.Duration = $dur.ToString("mm\:ss")
+    $Results.Summary.EndTime  = $end.ToString("yyyy-MM-dd HH:mm:ss")
+
+    $score = 100
+    $sec = $Results.Security.Vulnerabilities
+    $qlt = $Results.Quality.ESLint
+    $depOut = $Results.Dependencies.Outdated
+    $depUnused = $Results.Dependencies.Unused
+
+    $crit=0;$high=0;$mod=0
+    if ($sec) { $crit=$sec.Critical; $high=$sec.High; $mod=$sec.Moderate }
+    $err=0;$warn=0
+    if ($qlt) { $err=$qlt.Errors; $warn=$qlt.Warnings }
+    $outCount = 0; $unusedCount = 0
+    if ($depOut) { $outCount = $depOut.Count }
+    if ($depUnused) { $unusedCount = $depUnused.Count }
+
+    if ($crit -gt 0) { $score -= 20 }
+    if ($high -gt 0) { $score -= 15 }
+    if ($mod  -gt 0) { $score -= 10 }
+    if ($err  -gt 0) { $score -= 10 }
+    if ($warn -gt 10){ $score -= 5 }
+    if ($outCount -gt 10){ $score -= 5 }
+    if ($unusedCount -gt 5){ $score -= 5 }
+
+    if ($score -lt 0) { $score = 0 }
+    $Results.Summary.Score = $score
+    $grade = "F"
+    if ($score -ge 90) { $grade = "A" }
+    elseif ($score -ge 80) { $grade = "B" }
+    elseif ($score -ge 70) { $grade = "C" }
+    elseif ($score -ge 60) { $grade = "D" }
+    $Results.Summary.Grade = $grade
+
+    Ensure-OutputDir
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $jsonPath = Join-Path $OutputPath "audit-report-$stamp.json"
+    $txtPath  = Join-Path $OutputPath "audit-report-$stamp.txt"
+
+    ($Results | ConvertTo-Json -Depth 10) | Out-File $jsonPath -Encoding UTF8
+    (Get-TextReport) | Out-File $txtPath -Encoding UTF8
+    Write-Log "JSON: $jsonPath" $Colors.Success "+"
+    Write-Log "TXT : $txtPath"  $Colors.Success "+"
+}
+
+function Get-TextReport {
+@"
+================================================================================
+                         RELATÓRIO DE AUDITORIA NODE.JS
+================================================================================
+Data: $($Results.Timestamp)
+Duração: $($Results.Summary.Duration)
+
+--- PROJETO ---
+Nome: $($Results.ProjectInfo.Name)
+Versão: $($Results.ProjectInfo.Version)
+Descrição: $($Results.ProjectInfo.Description)
+Node.js: $($Results.ProjectInfo.NodeVersion)
+NPM: $($Results.ProjectInfo.NpmVersion)
+Dependências: $($Results.ProjectInfo.Dependencies)
+DevDependências: $($Results.ProjectInfo.DevDependencies)
+
+--- SEGURANÇA ---
+Críticas: $($Results.Security.Vulnerabilities.Critical)
+Altas:    $($Results.Security.Vulnerabilities.High)
+Médias:   $($Results.Security.Vulnerabilities.Moderate)
+Baixas:   $($Results.Security.Vulnerabilities.Low)
+Total:    $($Results.Security.Vulnerabilities.Total)
+Sensíveis: $((($Results.Security.SensitiveFiles) -join ', '))
+
+--- QUALIDADE ---
+ESLint: Erros=$($Results.Quality.ESLint.Errors) | Avisos=$($Results.Quality.ESLint.Warnings) | Arquivos=$($Results.Quality.ESLint.FilesAnalyzed)
+Métricas: Arquivos=$($Results.Quality.CodeMetrics.TotalFiles) | Linhas=$($Results.Quality.CodeMetrics.TotalLines) | Média=$($Results.Quality.CodeMetrics.AverageFileSize)
+
+--- DEPENDÊNCIAS ---
+Desatualizadas: $($Results.Dependencies.Outdated.Count)
+Não Utilizadas: $($Results.Dependencies.Unused.Count)
+
+--- TESTES ---
+$(
+    if ($Results.Tests.TotalTests) {
+        "Total=$($Results.Tests.TotalTests) | Passou=$($Results.Tests.PassedTests) | Falhou=$($Results.Tests.FailedTests) | Cobertura=$($Results.Tests.CoveragePercent)%"
+    } else {
+        $Results.Tests.Message
+    }
+)
+
+--- PERFORMANCE ---
+node_modules: $($Results.Performance.NodeModulesSize) MB
+Tamanhos de build:
+$(
+    ($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+    ForEach-Object { "  - {0}: {1} KB" -f ($_.Name -replace 'Size$',''), $_.Value }) -join "`r`n"
+)
+Scripts: $($Results.Performance.OptimizationScripts -join ', ')
+Sugestões:
+$(
+    if ($Results.Performance.Suggestions.Count -gt 0) {
+        ($Results.Performance.Suggestions | ForEach-Object { "  • $_" }) -join "`r`n"
+    } else { "  (Nenhuma)" }
+)
+
+--- RESULTADO ---
+PONTUAÇÃO: $($Results.Summary.Score)/100
+NOTA: $($Results.Summary.Grade)
+================================================================================
+"@
+}
+
+function Generate-HTMLReport {
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $htmlPath = Join-Path $OutputPath "audit-report-$stamp.html"
+    $html = @"
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relatório de Auditoria - $($Results.ProjectInfo.Name)</title>
+<style>
+body{font-family:Segoe UI,Tahoma,Arial,sans-serif;background:#f0f2f5;margin:0;padding:24px}
+.container{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.1);overflow:hidden}
+.header{background:#4f46e5;color:#fff;padding:32px 24px}
+.header h1{margin:0 0 8px 0}
+.section{padding:24px;border-top:1px solid #eee}
+h2{color:#4f46e5;margin:0 0 12px 0}
+.card{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:16px;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+th{background:#4f46e5;color:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600}
+</style></head><body>
+<div class="container">
+  <div class="header">
+    <h1>Relatório de Auditoria Node.js</h1>
+    <div>$($Results.ProjectInfo.Name) v$($Results.ProjectInfo.Version)</div>
+    <div>$($Results.Timestamp)</div>
+    <div style="margin-top:8px" class="badge">Score: $($Results.Summary.Score) | Nota: $($Results.Summary.Grade)</div>
+  </div>
+
+  <div class="section"><h2>Resumo</h2>
+    <div class="grid">
+      <div class="card"><div class="badge">Vulnerabilidades</div><div style="font-size:22px;margin-top:6px">$($Results.Security.Vulnerabilities.Total)</div></div>
+      <div class="card"><div class="badge">Erros ESLint</div><div style="font-size:22px;margin-top:6px">$($Results.Quality.ESLint.Errors)</div></div>
+      <div class="card"><div class="badge">Deps desatualizadas</div><div style="font-size:22px;margin-top:6px">$($Results.Dependencies.Outdated.Count)</div></div>
+      <div class="card"><div class="badge">Duração</div><div style="font-size:22px;margin-top:6px">$($Results.Summary.Duration)</div></div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Segurança</h2>
+    <table>
+      <thead><tr><th>Crítica</th><th>Alta</th><th>Média</th><th>Baixa</th><th>Total</th></tr></thead>
+      <tbody><tr>
+        <td>$($Results.Security.Vulnerabilities.Critical)</td>
+        <td>$($Results.Security.Vulnerabilities.High)</td>
+        <td>$($Results.Security.Vulnerabilities.Moderate)</td>
+        <td>$($Results.Security.Vulnerabilities.Low)</td>
+        <td>$($Results.Security.Vulnerabilities.Total)</td>
+      </tr></tbody>
+    </table>
+    <div class="card"><b>Arquivos sensíveis:</b> $((($Results.Security.SensitiveFiles) -join ', '))</div>
+  </div>
+
+  <div class="section"><h2>Qualidade</h2>
+    <div class="grid">
+      <div class="card">Arquivos: $($Results.Quality.CodeMetrics.TotalFiles)</div>
+      <div class="card">Linhas: $($Results.Quality.CodeMetrics.TotalLines)</div>
+      <div class="card">Média por arquivo: $($Results.Quality.CodeMetrics.AverageFileSize)</div>
+      <div class="card">Avisos ESLint: $($Results.Quality.ESLint.Warnings)</div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Dependências</h2>
+    <div class="card">Total deps: $($Results.ProjectInfo.Dependencies) | devDeps: $($Results.ProjectInfo.DevDependencies)</div>
+    $(if ($Results.Dependencies.Outdated.Count -gt 0) {
+      "<div class='card'><b>Desatualizadas:</b><br/>" +
+      ($Results.Dependencies.Outdated.Packages | ForEach-Object { "$($_.Name): $($_.Current) → $($_.Wanted) (latest: $($_.Latest))" } -join "<br/>")
+      + "</div>"
+    })
+  </div>
+
+  <div class="section"><h2>Performance</h2>
+    <div class="grid">
+      <div class="card">node_modules: $($Results.Performance.NodeModulesSize) MB</div>
+      $(($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+         ForEach-Object { "<div class='card'>" + ($_.Name -replace 'Size$','') + ": " + $_.Value + " KB</div>" }) -join '')
+    </div>
+    $(if ($Results.Performance.Suggestions.Count -gt 0) {
+      "<div class='card'><b>Sugestões:</b><ul>" +
+      ($Results.Performance.Suggestions ) -join "") + "</ul></div>"
+    })
+  </div>
+
+  <div class="section"><h2>Resultado</h2>
+    <div class="card">PONTUAÇÃO: $($Results.Summary.Score) / 100 — NOTA: $($Results.Summary.Grade)</div>
+  </div>
+</div>
+</body></html>
+"@
+    Ensure-OutputDir
+    $html | Out-File $htmlPath -Encoding UTF8
+    Write-Log "HTML: $htmlPath" $Colors.Success "+"
+    if ($env:OS -match 'Windows') { Start-Process $htmlPath }
+}
+
+function Start-Audit {
+    Clear-Host
+    Write-Host "NODE.JS PROJECT AUDITOR (compat) — sem classe/operadores nulos" -ForegroundColor Cyan
+
+    Write-Log "Verificando Node e NPM..." $Colors.Info "..."
+    $nodeVersion = node --version 2>$null
+    if (-not $nodeVersion) { Write-Log "Node.js não está instalado." $Colors.Error "X"; return }
+    $npmVersion = npm --version 2>$null
+    if (-not $npmVersion) { Write-Log "NPM não está instalado." $Colors.Error "X"; return }
+    Write-Log "Node: $nodeVersion | NPM: $npmVersion" $Colors.Success "+"
+
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado em $ProjectPath" $Colors.Error "X"
+        return
+    }
+
+    Ensure-OutputDir
+    Get-ProjectInfo
+    if (-not $SkipSecurity)     { Audit-Security }
+    if (-not $SkipQuality)      { Audit-Quality }
+    if (-not $SkipDependencies) { Audit-Dependencies }
+    if (-not $SkipTests)        { Audit-Tests }
+    if (-not $SkipPerformance)  { Audit-Performance }
+    Generate-Report
+    if ($GenerateHTML) { Generate-HTMLReport }
+    Write-Log "Concluído." $Colors.Success "+"
+}
+
+Start-Audit
+
+
+
+
+
+
+
+)</li>" })) -join "") +
+  "</ul>"
+} else {
+  ""
+}) {
+        ($Results.Performance.Suggestions | ForEach-Object { "  • $_" }) -join "`r`n"
+    } else { "  (Nenhuma)" }
+)
+
+--- RESULTADO ---
+PONTUAÇÃO: $($Results.Summary.Score)/100
+NOTA: $($Results.Summary.Grade)
+================================================================================
+"@
+}
+
+function Generate-HTMLReport {
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $htmlPath = Join-Path $OutputPath "audit-report-$stamp.html"
+    $html = @"
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relatório de Auditoria - $($Results.ProjectInfo.Name)</title>
+<style>
+body{font-family:Segoe UI,Tahoma,Arial,sans-serif;background:#f0f2f5;margin:0;padding:24px}
+.container{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.1);overflow:hidden}
+.header{background:#4f46e5;color:#fff;padding:32px 24px}
+.header h1{margin:0 0 8px 0}
+.section{padding:24px;border-top:1px solid #eee}
+h2{color:#4f46e5;margin:0 0 12px 0}
+.card{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:16px;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+th{background:#4f46e5;color:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600}
+</style></head><body>
+<div class="container">
+  <div class="header">
+    <h1>Relatório de Auditoria Node.js</h1>
+    <div>$($Results.ProjectInfo.Name) v$($Results.ProjectInfo.Version)</div>
+    <div>$($Results.Timestamp)</div>
+    <div style="margin-top:8px" class="badge">Score: $($Results.Summary.Score) | Nota: $($Results.Summary.Grade)</div>
+  </div>
+
+  <div class="section"><h2>Resumo</h2>
+    <div class="grid">
+      <div class="card"><div class="badge">Vulnerabilidades</div><div style="font-size:22px;margin-top:6px">$($Results.Security.Vulnerabilities.Total)</div></div>
+      <div class="card"><div class="badge">Erros ESLint</div><div style="font-size:22px;margin-top:6px">$($Results.Quality.ESLint.Errors)</div></div>
+      <div class="card"><div class="badge">Deps desatualizadas</div><div style="font-size:22px;margin-top:6px">$($Results.Dependencies.Outdated.Count)</div></div>
+      <div class="card"><div class="badge">Duração</div><div style="font-size:22px;margin-top:6px">$($Results.Summary.Duration)</div></div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Segurança</h2>
+    <table>
+      <thead><tr><th>Crítica</th><th>Alta</th><th>Média</th><th>Baixa</th><th>Total</th></tr></thead>
+      <tbody><tr>
+        <td>$($Results.Security.Vulnerabilities.Critical)</td>
+        <td>$($Results.Security.Vulnerabilities.High)</td>
+        <td>$($Results.Security.Vulnerabilities.Moderate)</td>
+        <td>$($Results.Security.Vulnerabilities.Low)</td>
+        <td>$($Results.Security.Vulnerabilities.Total)</td>
+      </tr></tbody>
+    </table>
+    <div class="card"><b>Arquivos sensíveis:</b> $((($Results.Security.SensitiveFiles) -join ', '))</div>
+  </div>
+
+  <div class="section"><h2>Qualidade</h2>
+    <div class="grid">
+      <div class="card">Arquivos: $($Results.Quality.CodeMetrics.TotalFiles)</div>
+      <div class="card">Linhas: $($Results.Quality.CodeMetrics.TotalLines)</div>
+      <div class="card">Média por arquivo: $($Results.Quality.CodeMetrics.AverageFileSize)</div>
+      <div class="card">Avisos ESLint: $($Results.Quality.ESLint.Warnings)</div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Dependências</h2>
+    <div class="card">Total deps: $($Results.ProjectInfo.Dependencies) | devDeps: $($Results.ProjectInfo.DevDependencies)</div>
+    $(if ($Results.Dependencies.Outdated.Count -gt 0) {
+      "<div class='card'><b>Desatualizadas:</b><br/>" +
+      ($Results.Dependencies.Outdated.Packages | ForEach-Object { "$($_.Name): $($_.Current) → $($_.Wanted) (latest: $($_.Latest))" } -join "<br/>")
+      + "</div>"
+    })
+  </div>
+
+  <div class="section"><h2>Performance</h2>
+    <div class="grid">
+      <div class="card">node_modules: $($Results.Performance.NodeModulesSize) MB</div>
+      $(($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+         ForEach-Object { "<div class='card'>" + ($_.Name -replace 'Size$','') + ": " + $_.Value + " KB</div>" }) -join '')
+    </div>
+    $(if ($Results.Performance.Suggestions.Count -gt 0) {
+  "<h3>💡 Sugestões de Otimização:</h3><ul>" +
+  ((@($Results.Performance.Suggestions | ForEach-Object { "<li>$(param(
+    [string]$ProjectPath = (Get-Location),
+    [switch]$SkipSecurity,
+    [switch]$SkipQuality,
+    [switch]$SkipDependencies,
+    [switch]$SkipTests,
+    [switch]$SkipPerformance,
+    [switch]$GenerateHTML,
+    [string]$OutputPath = ".\audit-reports"
+)
+
+# ---------- Util ----------
+$Colors = @{
+    Success = 'Green'
+    Error   = 'Red'
+    Warning = 'Yellow'
+    Info    = 'Cyan'
+    Header  = 'Magenta'
+}
+
+function Write-Log([string]$Message, [string]$Color = "White", [string]$Symbol = ">") {
+    Write-Host "$Symbol $Message" -ForegroundColor $Color
+}
+
+function Write-Header([string]$Title) {
+    Write-Host ""
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+    Write-Host "  $Title" -ForegroundColor $Colors.Header
+    Write-Host ("=" * 60) -ForegroundColor $Colors.Header
+}
+
+function Exec([string]$Command, [string]$Desc) {
+    Write-Log $Desc $Colors.Info "..."
+    $r = [ordered]@{ Success = $false; Output = ""; Error = ""; ExitCode = -1 }
+    try {
+        $isWin = $env:OS -match 'Windows'
+        $file = $isWin ? "cmd.exe" : "/bin/bash"
+        $args = $isWin ? "/c $Command" : "-lc ""$Command"""
+
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $file
+        $psi.Arguments = $args
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.WorkingDirectory = $ProjectPath
+
+        $p = [System.Diagnostics.Process]::new()
+        $p.StartInfo = $psi
+        $p.Start() | Out-Null
+        $out = $p.StandardOutput.ReadToEnd()
+        $err = $p.StandardError.ReadToEnd()
+        $p.WaitForExit()
+
+        $r.Output   = $out
+        $r.Error    = $err
+        $r.ExitCode = $p.ExitCode
+        $r.Success  = ($p.ExitCode -eq 0)
+    } catch {
+        $r.Error = $_.Exception.Message
+        Write-Log "Erro ao executar: $_" $Colors.Error "X"
+    }
+    return $r
+}
+
+# ---------- Estado ----------
+$Results = [ordered]@{
+    Timestamp    = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    ProjectInfo  = @{}
+    Security     = @{}
+    Quality      = @{}
+    Dependencies = @{}
+    Tests        = @{}
+    Performance  = @{}
+    Summary      = @{}
+}
+$StartTime = Get-Date
+$PackageJson = $null
+
+# ---------- Funções ----------
+function Ensure-OutputDir {
+    if (-not (Test-Path $OutputPath)) {
+        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+    }
+}
+
+function Get-ProjectInfo {
+    Write-Header "INFORMAÇÕES DO PROJETO"
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado!" $Colors.Error "X"
+        throw "Não é um projeto Node.js válido"
+    }
+    try {
+        $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+        $script:PackageJson = $pkg
+
+        $depsCount    = 0
+        $devDepsCount = 0
+        if ($pkg -and $pkg.PSObject.Properties['dependencies'])    { $depsCount    = @($pkg.dependencies.PSObject.Properties).Count }
+        if ($pkg -and $pkg.PSObject.Properties['devDependencies']) { $devDepsCount = @($pkg.devDependencies.PSObject.Properties).Count }
+
+        $Results.ProjectInfo = [ordered]@{
+            Name            = $pkg.name
+            Version         = $pkg.version
+            Description     = $pkg.description
+            NodeVersion     = ((node --version 2>$null) -replace '^v','')
+            NpmVersion      = (npm --version 2>$null)
+            Author          = $pkg.author
+            License         = $pkg.license
+            Scripts         = ($pkg.scripts | ConvertTo-Json -Compress)
+            Dependencies    = $depsCount
+            DevDependencies = $devDepsCount
+        }
+
+        Write-Log "Projeto: $($pkg.name) v$($pkg.version)" $Colors.Success "+"
+        Write-Log "Node.js: $($Results.ProjectInfo.NodeVersion)" $Colors.Info
+        Write-Log "NPM:     $($Results.ProjectInfo.NpmVersion)"  $Colors.Info
+        Write-Log "Deps: $depsCount | DevDeps: $devDepsCount"    $Colors.Info
+    } catch {
+        Write-Log "Erro ao ler package.json: $_" $Colors.Error "X"
+    }
+}
+
+function Audit-Security {
+    Write-Header "AUDITORIA DE SEGURANÇA"
+
+    $audit = Exec "npm audit --json" "Verificando vulnerabilidades (npm audit)"
+    $crit=0;$high=0;$mod=0;$low=0;$info=0;$total=0
+    if ($audit.Output) {
+        try {
+            $json = $audit.Output | ConvertFrom-Json
+            if ($json -and $json.PSObject.Properties['metadata']) {
+                $md = $json.metadata
+                if ($md -and $md.PSObject.Properties['vulnerabilities']) {
+                    $v = $md.vulnerabilities
+                    if ($v.PSObject.Properties['critical']) { $crit = [int]$v.critical }
+                    if ($v.PSObject.Properties['high'])     { $high = [int]$v.high }
+                    if ($v.PSObject.Properties['moderate']) { $mod  = [int]$v.moderate }
+                    if ($v.PSObject.Properties['low'])      { $low  = [int]$v.low }
+                    if ($v.PSObject.Properties['info'])     { $info = [int]$v.info }
+                    if ($v.PSObject.Properties['total'])    { $total= [int]$v.total } else { $total = $crit+$high+$mod+$low+$info }
+                }
+            }
+        } catch {
+            Write-Log "Falha ao interpretar npm audit (prosseguindo mesmo assim)." $Colors.Warning "!"
+        }
+    }
+    $Results.Security.Vulnerabilities = [ordered]@{
+        Critical=$crit; High=$high; Moderate=$mod; Low=$low; Info=$info; Total=$total
+    }
+
+    if ($total -eq 0) {
+        Write-Log "Nenhuma vulnerabilidade encontrada." $Colors.Success "+"
+    } else {
+        Write-Log "Críticas: $crit | Altas: $high | Médias: $mod | Baixas: $low | Info: $info" $Colors.Warning "!"
+        $fix = Exec "npm audit fix" "Tentando corrigir automaticamente (npm audit fix)"
+        if ($fix.Success) { Write-Log "Correções aplicadas." $Colors.Success "+" }
+    }
+
+    # Arquivos sensíveis
+    Write-Log "Verificando arquivos sensíveis" $Colors.Info "..."
+    $sensitive = @(".env",".env.local",".env.production","config.json","secrets.json")
+    $found = @()
+    foreach ($f in $sensitive) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $found += $f
+            $gi = Join-Path $ProjectPath ".gitignore"
+            if (Test-Path $gi) {
+                $giContent = Get-Content $gi -Raw
+                if ($giContent -notmatch [regex]::Escape($f)) {
+                    Write-Log "ALERTA: $f não está no .gitignore" $Colors.Error "!"
+                }
+            }
+        }
+    }
+    $Results.Security.SensitiveFiles = $found
+    if ($found.Count -gt 0) { Write-Log ("Arquivos sensíveis: " + ($found -join ", ")) $Colors.Warning "!" }
+}
+
+function Audit-Quality {
+    Write-Header "QUALIDADE DO CÓDIGO"
+
+    # ESLint (detecta config)
+    $eslintConfigs = @(".eslintrc",".eslintrc.json",".eslintrc.js",".eslintrc.cjs",".eslintrc.yaml",".eslintrc.yml",".eslintrc.mjs", "eslint.config.js","eslint.config.cjs", "eslint.config.mjs") |
+        ForEach-Object { Join-Path $ProjectPath $_ } | Where-Object { Test-Path $_ }
+
+    $hasPkgEslint = $false
+    if ($PackageJson -and $PackageJson.PSObject.Properties['eslintConfig']) { $hasPkgEslint = $true }
+
+    if ($true) {
+        $eslint = Exec "npx eslint . --format json" "Executando ESLint"
+        if ($eslint.Output) {
+            try {
+                $e = $eslint.Output | ConvertFrom-Json
+                $err = ($e | ForEach-Object { $_.errorCount } | Measure-Object -Sum).Sum
+                $warn= ($e | ForEach-Object { $_.warningCount } | Measure-Object -Sum).Sum
+                $files = $e.Count
+                $Results.Quality.ESLint = [ordered]@{ Errors=$err; Warnings=$warn; FilesAnalyzed=$files }
+                Write-Log "ESLint: Erros=$err | Avisos=$warn | Arquivos=$files" $Colors.Info
+            } catch {
+                Write-Log "ESLint executado, mas não foi possível ler JSON. Supondo sem problemas críticos." $Colors.Success "+"
+            }
+        }
+    } else {
+        Write-Log "ESLint não configurado" $Colors.Warning "!"
+    }
+
+    # Métricas simples (JS/TS/JSX/TSX)
+    $files = Get-ChildItem -Path $ProjectPath -Recurse -File -Include *.js,*.jsx,*.ts,*.tsx -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|dist|build)[\\/]' }
+    $total = $files.Count
+    $lines = 0
+    foreach ($f in $files) {
+        $lines += (Get-Content $f.FullName -ErrorAction SilentlyContinue | Measure-Object -Line).Lines
+    }
+    $avg = 0
+    if ($total -gt 0) { $avg = [math]::Round($lines / $total, 2) }
+    $Results.Quality.CodeMetrics = [ordered]@{ TotalFiles=$total; TotalLines=$lines; AverageFileSize=$avg }
+    Write-Log "Arquivos=$total | Linhas=$lines | Média por arquivo=$avg" $Colors.Info
+}
+
+function Audit-Dependencies {
+    Write-Header "DEPENDÊNCIAS"
+
+    $out = Exec "npm outdated --json" "Verificando desatualizações"
+    $count=0;$list=@()
+    if ($out.Output) {
+        try {
+            $j = $out.Output | ConvertFrom-Json
+            if ($j) {
+                $props = $j | Get-Member -MemberType NoteProperty
+                $count = $props.Count
+                foreach ($p in $props) {
+                    $item = $j.($p.Name)
+                    $list += [ordered]@{ Name=$p.Name; Current=$item.current; Wanted=$item.wanted; Latest=$item.latest }
+                }
+            }
+        } catch {
+            # nada
+        }
+    }
+    $Results.Dependencies.Outdated = [ordered]@{ Count=$count; Packages=$list }
+    if ($count -gt 0) {
+        Write-Log "Dependências desatualizadas: $count" $Colors.Warning "!"
+        foreach ($pkg in $list) {
+            Write-Log "  $($pkg.Name): $($pkg.Current) -> $($pkg.Wanted) (latest: $($pkg.Latest))" $Colors.Warning " "
+        }
+    } else {
+        Write-Log "Todas as dependências estão atualizadas." $Colors.Success "+"
+    }
+
+    $dep = Exec "npx depcheck apps/api --json" "Verificando dependências não utilizadas"
+    $unused=@(); $unusedDev=@()
+    if ($dep.Output) {
+        try {
+            $dj = $dep.Output | ConvertFrom-Json
+            if ($dj -and $dj.PSObject.Properties['dependencies'])    { $unused    = @($dj.dependencies) }
+            if ($dj -and $dj.PSObject.Properties['devDependencies']) { $unusedDev = @($dj.devDependencies) }
+        } catch {}
+    }
+    $unusedCount = ($unused.Count + $unusedDev.Count)
+    $Results.Dependencies.Unused = [ordered]@{ Dependencies=$unused; DevDependencies=$unusedDev; Count=$unusedCount }
+    if ($unusedCount -gt 0) {
+        if ($unused.Count -gt 0)   { Write-Log ("Dependências não usadas: " + ($unused -join ", ")) $Colors.Warning "!" }
+        if ($unusedDev.Count -gt 0){ Write-Log ("DevDeps não usados: " + ($unusedDev -join ", ")) $Colors.Warning "!" }
+    } else {
+        Write-Log "Todas as dependências estão sendo utilizadas." $Colors.Success "+"
+    }
+
+    $lic = Exec "npx license-checker --summary" "Analisando licenças"
+    if ($lic.Output) {
+        $Results.Dependencies.Licenses = $lic.Output
+        Write-Log "Análise de licenças concluída." $Colors.Success "+"
+    }
+}
+
+function Audit-Tests {
+    Write-Header "TESTES"
+    $pkg = $script:PackageJson
+    if (-not $pkg) {
+        $pkgPath = Join-Path $ProjectPath "package.json"
+        try { $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json } catch {}
+    }
+    if ($pkg -and $pkg.PSObject.Properties['scripts'] -and $pkg.scripts -and $pkg.scripts.PSObject.Properties['test']) {
+        Write-Log "Executando testes (npm test)" $Colors.Info "..."
+        $cmd = "npm test"
+        if ($pkg.scripts.test -match "jest")  { $cmd = "npm test -- --coverage --json --outputFile=test-results.json" }
+        if ($pkg.scripts.test -match "mocha") { $cmd = "npm test -- --reporter json > test-results.json" }
+
+        $tr = Exec $cmd "Rodando suite de testes"
+        $res = [ordered]@{}
+        $jsonPath = Join-Path $ProjectPath "test-results.json"
+        if (Test-Path $jsonPath) {
+            try {
+                $tj = Get-Content $jsonPath -Raw | ConvertFrom-Json
+                if ($tj.PSObject.Properties['success'])       { $res.Success     = $tj.success }
+                if ($tj.PSObject.Properties['numTotalTests']) { $res.TotalTests  = $tj.numTotalTests }
+                if ($tj.PSObject.Properties['numPassedTests']){ $res.PassedTests = $tj.numPassedTests }
+                if ($tj.PSObject.Properties['numFailedTests']){ $res.FailedTests = $tj.numFailedTests }
+                $res.Coverage = (if ($tj.PSObject.Properties['coverageMap']) { "Disponível" } else { "Não disponível" })
+                Remove-Item $jsonPath -Force -ErrorAction SilentlyContinue
+            } catch {
+                Write-Log "Testes executados (sem JSON parseável)" $Colors.Warning "!"
+            }
+        } else {
+            $res.Success = $tr.Success
+        }
+        $Results.Tests = $res
+
+        # cobertura do Jest (coverage-summary.json)
+        $covDir = Join-Path $ProjectPath "coverage"
+        if (Test-Path $covDir) {
+            $sum = Join-Path $covDir "coverage-summary.json"
+            if (Test-Path $sum) {
+                try {
+                    $sj = Get-Content $sum -Raw | ConvertFrom-Json
+                    if ($sj -and $sj.PSObject.Properties['total'] -and $sj.total.PSObject.Properties['lines']) {
+                        $pct = $sj.total.lines.pct
+                        $Results.Tests.CoveragePercent = $pct
+                        Write-Log "Cobertura de linhas: $pct%" $Colors.Success "+"
+                    }
+                } catch {}
+            }
+        }
+    } else {
+        Write-Log "Nenhum script de teste configurado" $Colors.Warning "!"
+        $Results.Tests.Message = "Nenhum teste configurado"
+    }
+}
+
+function Audit-Performance {
+    Write-Header "PERFORMANCE"
+    Write-Log "Calculando tamanhos..." $Colors.Info "..."
+
+    $nm = Join-Path $ProjectPath "node_modules"
+    if (Test-Path $nm) {
+        try {
+            $mb = (Get-ChildItem $nm -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+            $mb = [math]::Round($mb,2)
+            $Results.Performance.NodeModulesSize = $mb
+            Write-Log "node_modules: $mb MB" ($mb -gt 500 ? $Colors.Warning : $Colors.Info)
+        } catch {
+            Write-Log "Falha ao medir node_modules (ignorado)" $Colors.Warning "!"
+        }
+    }
+
+    foreach ($f in @("dist","build","public")) {
+        $p = Join-Path $ProjectPath $f
+        if (Test-Path $p) {
+            $kb = (Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1KB
+            $kb = [math]::Round($kb,2)
+            $Results.Performance["$($f)Size"] = $kb
+            Write-Log ("$f`: {0} KB" -f $kb) $Colors.Info
+        }
+    }
+
+    $found = @()
+    if ($PackageJson -and $PackageJson.PSObject.Properties['scripts']) {
+        foreach ($s in @("build","build:prod","optimize","minify")) {
+            if ($PackageJson.scripts.PSObject.Properties[$s]) { $found += $s }
+        }
+    }
+    $Results.Performance.OptimizationScripts = $found
+    if ($found.Count -gt 0) { Write-Log ("Scripts de otimização: " + ($found -join ", ")) $Colors.Success "+" }
+    else { Write-Log "Nenhum script de otimização encontrado" $Colors.Warning "!" }
+
+    $sug = @()
+    if (($Results.Performance.NodeModulesSize -as [double]) -gt 500) { $sug += "Use 'npm prune' para remover pacotes não utilizados." }
+    if ($found.Count -eq 0) { $sug += "Configure scripts de build/otimização no package.json." }
+    $Results.Performance.Suggestions = $sug
+    if ($sug.Count -gt 0) {
+        Write-Log "Sugestões:" $Colors.Info "-"
+        foreach ($x in $sug) { Write-Log "  - $x" $Colors.Warning " " }
+    }
+}
+
+function Generate-Report {
+    Write-Header "RELATÓRIOS"
+    $end = Get-Date
+    $dur = $end - $StartTime
+    $Results.Summary.Duration = $dur.ToString("mm\:ss")
+    $Results.Summary.EndTime  = $end.ToString("yyyy-MM-dd HH:mm:ss")
+
+    $score = 100
+    $sec = $Results.Security.Vulnerabilities
+    $qlt = $Results.Quality.ESLint
+    $depOut = $Results.Dependencies.Outdated
+    $depUnused = $Results.Dependencies.Unused
+
+    $crit=0;$high=0;$mod=0
+    if ($sec) { $crit=$sec.Critical; $high=$sec.High; $mod=$sec.Moderate }
+    $err=0;$warn=0
+    if ($qlt) { $err=$qlt.Errors; $warn=$qlt.Warnings }
+    $outCount = 0; $unusedCount = 0
+    if ($depOut) { $outCount = $depOut.Count }
+    if ($depUnused) { $unusedCount = $depUnused.Count }
+
+    if ($crit -gt 0) { $score -= 20 }
+    if ($high -gt 0) { $score -= 15 }
+    if ($mod  -gt 0) { $score -= 10 }
+    if ($err  -gt 0) { $score -= 10 }
+    if ($warn -gt 10){ $score -= 5 }
+    if ($outCount -gt 10){ $score -= 5 }
+    if ($unusedCount -gt 5){ $score -= 5 }
+
+    if ($score -lt 0) { $score = 0 }
+    $Results.Summary.Score = $score
+    $grade = "F"
+    if ($score -ge 90) { $grade = "A" }
+    elseif ($score -ge 80) { $grade = "B" }
+    elseif ($score -ge 70) { $grade = "C" }
+    elseif ($score -ge 60) { $grade = "D" }
+    $Results.Summary.Grade = $grade
+
+    Ensure-OutputDir
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $jsonPath = Join-Path $OutputPath "audit-report-$stamp.json"
+    $txtPath  = Join-Path $OutputPath "audit-report-$stamp.txt"
+
+    ($Results | ConvertTo-Json -Depth 10) | Out-File $jsonPath -Encoding UTF8
+    (Get-TextReport) | Out-File $txtPath -Encoding UTF8
+    Write-Log "JSON: $jsonPath" $Colors.Success "+"
+    Write-Log "TXT : $txtPath"  $Colors.Success "+"
+}
+
+function Get-TextReport {
+@"
+================================================================================
+                         RELATÓRIO DE AUDITORIA NODE.JS
+================================================================================
+Data: $($Results.Timestamp)
+Duração: $($Results.Summary.Duration)
+
+--- PROJETO ---
+Nome: $($Results.ProjectInfo.Name)
+Versão: $($Results.ProjectInfo.Version)
+Descrição: $($Results.ProjectInfo.Description)
+Node.js: $($Results.ProjectInfo.NodeVersion)
+NPM: $($Results.ProjectInfo.NpmVersion)
+Dependências: $($Results.ProjectInfo.Dependencies)
+DevDependências: $($Results.ProjectInfo.DevDependencies)
+
+--- SEGURANÇA ---
+Críticas: $($Results.Security.Vulnerabilities.Critical)
+Altas:    $($Results.Security.Vulnerabilities.High)
+Médias:   $($Results.Security.Vulnerabilities.Moderate)
+Baixas:   $($Results.Security.Vulnerabilities.Low)
+Total:    $($Results.Security.Vulnerabilities.Total)
+Sensíveis: $((($Results.Security.SensitiveFiles) -join ', '))
+
+--- QUALIDADE ---
+ESLint: Erros=$($Results.Quality.ESLint.Errors) | Avisos=$($Results.Quality.ESLint.Warnings) | Arquivos=$($Results.Quality.ESLint.FilesAnalyzed)
+Métricas: Arquivos=$($Results.Quality.CodeMetrics.TotalFiles) | Linhas=$($Results.Quality.CodeMetrics.TotalLines) | Média=$($Results.Quality.CodeMetrics.AverageFileSize)
+
+--- DEPENDÊNCIAS ---
+Desatualizadas: $($Results.Dependencies.Outdated.Count)
+Não Utilizadas: $($Results.Dependencies.Unused.Count)
+
+--- TESTES ---
+$(
+    if ($Results.Tests.TotalTests) {
+        "Total=$($Results.Tests.TotalTests) | Passou=$($Results.Tests.PassedTests) | Falhou=$($Results.Tests.FailedTests) | Cobertura=$($Results.Tests.CoveragePercent)%"
+    } else {
+        $Results.Tests.Message
+    }
+)
+
+--- PERFORMANCE ---
+node_modules: $($Results.Performance.NodeModulesSize) MB
+Tamanhos de build:
+$(
+    ($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+    ForEach-Object { "  - {0}: {1} KB" -f ($_.Name -replace 'Size$',''), $_.Value }) -join "`r`n"
+)
+Scripts: $($Results.Performance.OptimizationScripts -join ', ')
+Sugestões:
+$(
+    if ($Results.Performance.Suggestions.Count -gt 0) {
+        ($Results.Performance.Suggestions | ForEach-Object { "  • $_" }) -join "`r`n"
+    } else { "  (Nenhuma)" }
+)
+
+--- RESULTADO ---
+PONTUAÇÃO: $($Results.Summary.Score)/100
+NOTA: $($Results.Summary.Grade)
+================================================================================
+"@
+}
+
+function Generate-HTMLReport {
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $htmlPath = Join-Path $OutputPath "audit-report-$stamp.html"
+    $html = @"
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relatório de Auditoria - $($Results.ProjectInfo.Name)</title>
+<style>
+body{font-family:Segoe UI,Tahoma,Arial,sans-serif;background:#f0f2f5;margin:0;padding:24px}
+.container{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.1);overflow:hidden}
+.header{background:#4f46e5;color:#fff;padding:32px 24px}
+.header h1{margin:0 0 8px 0}
+.section{padding:24px;border-top:1px solid #eee}
+h2{color:#4f46e5;margin:0 0 12px 0}
+.card{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:16px;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+th{background:#4f46e5;color:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600}
+</style></head><body>
+<div class="container">
+  <div class="header">
+    <h1>Relatório de Auditoria Node.js</h1>
+    <div>$($Results.ProjectInfo.Name) v$($Results.ProjectInfo.Version)</div>
+    <div>$($Results.Timestamp)</div>
+    <div style="margin-top:8px" class="badge">Score: $($Results.Summary.Score) | Nota: $($Results.Summary.Grade)</div>
+  </div>
+
+  <div class="section"><h2>Resumo</h2>
+    <div class="grid">
+      <div class="card"><div class="badge">Vulnerabilidades</div><div style="font-size:22px;margin-top:6px">$($Results.Security.Vulnerabilities.Total)</div></div>
+      <div class="card"><div class="badge">Erros ESLint</div><div style="font-size:22px;margin-top:6px">$($Results.Quality.ESLint.Errors)</div></div>
+      <div class="card"><div class="badge">Deps desatualizadas</div><div style="font-size:22px;margin-top:6px">$($Results.Dependencies.Outdated.Count)</div></div>
+      <div class="card"><div class="badge">Duração</div><div style="font-size:22px;margin-top:6px">$($Results.Summary.Duration)</div></div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Segurança</h2>
+    <table>
+      <thead><tr><th>Crítica</th><th>Alta</th><th>Média</th><th>Baixa</th><th>Total</th></tr></thead>
+      <tbody><tr>
+        <td>$($Results.Security.Vulnerabilities.Critical)</td>
+        <td>$($Results.Security.Vulnerabilities.High)</td>
+        <td>$($Results.Security.Vulnerabilities.Moderate)</td>
+        <td>$($Results.Security.Vulnerabilities.Low)</td>
+        <td>$($Results.Security.Vulnerabilities.Total)</td>
+      </tr></tbody>
+    </table>
+    <div class="card"><b>Arquivos sensíveis:</b> $((($Results.Security.SensitiveFiles) -join ', '))</div>
+  </div>
+
+  <div class="section"><h2>Qualidade</h2>
+    <div class="grid">
+      <div class="card">Arquivos: $($Results.Quality.CodeMetrics.TotalFiles)</div>
+      <div class="card">Linhas: $($Results.Quality.CodeMetrics.TotalLines)</div>
+      <div class="card">Média por arquivo: $($Results.Quality.CodeMetrics.AverageFileSize)</div>
+      <div class="card">Avisos ESLint: $($Results.Quality.ESLint.Warnings)</div>
+    </div>
+  </div>
+
+  <div class="section"><h2>Dependências</h2>
+    <div class="card">Total deps: $($Results.ProjectInfo.Dependencies) | devDeps: $($Results.ProjectInfo.DevDependencies)</div>
+    $(if ($Results.Dependencies.Outdated.Count -gt 0) {
+      "<div class='card'><b>Desatualizadas:</b><br/>" +
+      ($Results.Dependencies.Outdated.Packages | ForEach-Object { "$($_.Name): $($_.Current) → $($_.Wanted) (latest: $($_.Latest))" } -join "<br/>")
+      + "</div>"
+    })
+  </div>
+
+  <div class="section"><h2>Performance</h2>
+    <div class="grid">
+      <div class="card">node_modules: $($Results.Performance.NodeModulesSize) MB</div>
+      $(($Results.Performance.PSObject.Properties | Where-Object { $_.Name -match 'Size$' -and $_.Name -ne 'NodeModulesSize' } |
+         ForEach-Object { "<div class='card'>" + ($_.Name -replace 'Size$','') + ": " + $_.Value + " KB</div>" }) -join '')
+    </div>
+    $(if ($Results.Performance.Suggestions.Count -gt 0) {
+      "<div class='card'><b>Sugestões:</b><ul>" +
+      ($Results.Performance.Suggestions ) -join "") + "</ul></div>"
+    })
+  </div>
+
+  <div class="section"><h2>Resultado</h2>
+    <div class="card">PONTUAÇÃO: $($Results.Summary.Score) / 100 — NOTA: $($Results.Summary.Grade)</div>
+  </div>
+</div>
+</body></html>
+"@
+    Ensure-OutputDir
+    $html | Out-File $htmlPath -Encoding UTF8
+    Write-Log "HTML: $htmlPath" $Colors.Success "+"
+    if ($env:OS -match 'Windows') { Start-Process $htmlPath }
+}
+
+function Start-Audit {
+    Clear-Host
+    Write-Host "NODE.JS PROJECT AUDITOR (compat) — sem classe/operadores nulos" -ForegroundColor Cyan
+
+    Write-Log "Verificando Node e NPM..." $Colors.Info "..."
+    $nodeVersion = node --version 2>$null
+    if (-not $nodeVersion) { Write-Log "Node.js não está instalado." $Colors.Error "X"; return }
+    $npmVersion = npm --version 2>$null
+    if (-not $npmVersion) { Write-Log "NPM não está instalado." $Colors.Error "X"; return }
+    Write-Log "Node: $nodeVersion | NPM: $npmVersion" $Colors.Success "+"
+
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado em $ProjectPath" $Colors.Error "X"
+        return
+    }
+
+    Ensure-OutputDir
+    Get-ProjectInfo
+    if (-not $SkipSecurity)     { Audit-Security }
+    if (-not $SkipQuality)      { Audit-Quality }
+    if (-not $SkipDependencies) { Audit-Dependencies }
+    if (-not $SkipTests)        { Audit-Tests }
+    if (-not $SkipPerformance)  { Audit-Performance }
+    Generate-Report
+    if ($GenerateHTML) { Generate-HTMLReport }
+    Write-Log "Concluído." $Colors.Success "+"
+}
+
+Start-Audit
+
+
+
+
+
+
+
+)</li>" })) -join "") +
+  "</ul>"
+} else {
+  ""
+}) {
+      "<div class='card'><b>Sugestões:</b><ul>" +
+      ($Results.Performance.Suggestions ) -join "") + "</ul></div>"
+    })
+  </div>
+
+  <div class="section"><h2>Resultado</h2>
+    <div class="card">PONTUAÇÃO: $($Results.Summary.Score) / 100 — NOTA: $($Results.Summary.Grade)</div>
+  </div>
+</div>
+</body></html>
+"@
+    Ensure-OutputDir
+    $html | Out-File $htmlPath -Encoding UTF8
+    Write-Log "HTML: $htmlPath" $Colors.Success "+"
+    if ($env:OS -match 'Windows') { Start-Process $htmlPath }
+}
+
+function Start-Audit {
+    Clear-Host
+    Write-Host "NODE.JS PROJECT AUDITOR (compat) — sem classe/operadores nulos" -ForegroundColor Cyan
+
+    Write-Log "Verificando Node e NPM..." $Colors.Info "..."
+    $nodeVersion = node --version 2>$null
+    if (-not $nodeVersion) { Write-Log "Node.js não está instalado." $Colors.Error "X"; return }
+    $npmVersion = npm --version 2>$null
+    if (-not $npmVersion) { Write-Log "NPM não está instalado." $Colors.Error "X"; return }
+    Write-Log "Node: $nodeVersion | NPM: $npmVersion" $Colors.Success "+"
+
+    $pkgPath = Join-Path $ProjectPath "package.json"
+    if (-not (Test-Path $pkgPath)) {
+        Write-Log "package.json não encontrado em $ProjectPath" $Colors.Error "X"
+        return
+    }
+
+    Ensure-OutputDir
+    Get-ProjectInfo
+    if (-not $SkipSecurity)     { Audit-Security }
+    if (-not $SkipQuality)      { Audit-Quality }
+    if (-not $SkipDependencies) { Audit-Dependencies }
+    if (-not $SkipTests)        { Audit-Tests }
+    if (-not $SkipPerformance)  { Audit-Performance }
+    Generate-Report
+    if ($GenerateHTML) { Generate-HTMLReport }
+    Write-Log "Concluído." $Colors.Success "+"
+}
+
+Start-Audit
+
+
+
+
+
+
+
+

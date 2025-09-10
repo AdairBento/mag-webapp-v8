@@ -1,0 +1,30 @@
+{
+  "title": "pdf.generated.v1",
+  "type": "object",
+  "properties": {
+    "docId": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "docType": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "docId",
+    "tenantId",
+    "docType",
+    "url",
+    "createdAt"
+  ]
+}

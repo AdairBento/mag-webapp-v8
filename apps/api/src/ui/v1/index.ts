@@ -33,3 +33,8 @@ router.get("/vehicles", async (req, res) => {
 
 module.exports = router;
 
+
+import { Router } from 'express';
+export const v1Router = Router();
+v1Router.get('/ping', (_req, res) => res.json({ ok: true }));
+

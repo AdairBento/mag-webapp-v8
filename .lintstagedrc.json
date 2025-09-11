@@ -1,4 +1,4 @@
 {
-  "{apps,packages}/**/*.{js,mjs,cjs,ts,tsx}": ["eslint --fix"],
+  "{apps,packages}/**/*.{js,mjs,cjs,ts,tsx}": ["eslint --fix --max-warnings 0"],
   "{apps,packages}/**/*.{json,md}": ["prettier --write"]
 }

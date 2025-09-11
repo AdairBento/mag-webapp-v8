@@ -1,6 +1,6 @@
-const createHealthHandler = require("./health-extended");
+﻿const createHealthHandler = require("./health-extended");
 // src/index.js
-// MAG API — Express + Prisma (alias availability, paginação, CORS/Helmet, filtros e POSTs + cálculo de amount)
+// MAG API â€” Express + Prisma (alias availability, paginaÃ§Ã£o, CORS/Helmet, filtros e POSTs + cÃ¡lculo de amount)
 
 require("dotenv/config");
 const express = require("express");
@@ -35,7 +35,7 @@ function getPaging(req) {
 
 function requireNonEmpty(value, field) {
   if (value === undefined || value === null || String(value).trim() === "") {
-    throw new ApiError("bad_request", `${field} é obrigatório`, 400, { field });
+    throw new ApiError("bad_request", `${field} Ã© obrigatÃ³rio`, 400, { field });
   }
   return value;
 }
@@ -46,14 +46,14 @@ function isIsoDate(s) {
 
 function requireIsoDate(s, field) {
   if (!isIsoDate(s)) {
-    throw new ApiError("bad_request", `${field} inválido (use YYYY-MM-DD)`, 400, { [field]: s });
+    throw new ApiError("bad_request", `${field} invÃ¡lido (use YYYY-MM-DD)`, 400, { [field]: s });
   }
   return s;
 }
 
 function toDate(s) {
   const d = new Date(s);
-  if (isNaN(d.getTime())) throw new ApiError("bad_request", `data inválida`, 400, { value: s });
+  if (isNaN(d.getTime())) throw new ApiError("bad_request", `data invÃ¡lida`, 400, { value: s });
   return d;
 }
 
@@ -170,7 +170,7 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
 
     const blockedIds = [...new Set(overlapping.map((r) => r.vehicleId))];
 
-    // Disponíveis = available - bloqueados no range
+    // DisponÃ­veis = available - bloqueados no range
     const mode = String(req.query.mode || "available").toLowerCase();
     let vehicleWhere;
     if (mode === "blocked") {
@@ -212,12 +212,12 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
 
 app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
 
-// Clients (GET com paginação)
+// Clients (GET com paginaÃ§Ã£o)
 app.get("/api/v1/clients", async (req, res, next) => {
   try {
     const { tenantId } = req.query;
     if (!tenantId)
-      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+      return res.status(400).json({ error: "bad_request", message: "tenantId Ã© obrigatÃ³rio" });
 
     const { page, limit, skip } = getPaging(req);
     const [items, total] = await Promise.all([
@@ -233,12 +233,12 @@ app.get("/api/v1/clients", async (req, res, next) => {
   }
 });
 
-// Vehicles (GET com paginação)
+// Vehicles (GET com paginaÃ§Ã£o)
 app.get("/api/v1/vehicles", async (req, res, next) => {
   try {
     const { tenantId } = req.query;
     if (!tenantId)
-      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+      return res.status(400).json({ error: "bad_request", message: "tenantId Ã© obrigatÃ³rio" });
 
     const { page, limit, skip } = getPaging(req);
     const [items, total] = await Promise.all([
@@ -254,24 +254,24 @@ app.get("/api/v1/vehicles", async (req, res, next) => {
   }
 });
 
-// Rentals (GET com paginação + filtros opcionais)
+// Rentals (GET com paginaÃ§Ã£o + filtros opcionais)
 app.get("/api/v1/rentals", async (req, res, next) => {
   try {
     const { tenantId, status, startFrom, endTo } = req.query;
     if (!tenantId)
-      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+      return res.status(400).json({ error: "bad_request", message: "tenantId Ã© obrigatÃ³rio" });
 
     if (status && !isValidStatus(status)) {
       return res.status(400).json({
         error: "bad_request",
-        message: "status inválido",
+        message: "status invÃ¡lido",
         details: { allowed: Object.values(RENTAL_STATUSES) },
       });
     }
     if ((startFrom && !isIsoDate(startFrom)) || (endTo && !isIsoDate(endTo))) {
       return res.status(400).json({
         error: "bad_request",
-        message: "datas inválidas (use YYYY-MM-DD)",
+        message: "datas invÃ¡lidas (use YYYY-MM-DD)",
         details: { startFrom, endTo },
       });
     }
@@ -408,7 +408,7 @@ app.post("/api/v1/rentals", async (req, res, next) => {
 
     const rentalStatus = status || RENTAL_STATUSES.CONFIRMED;
     if (!isValidStatus(rentalStatus)) {
-      throw new ApiError("bad_request", "status inválido", 400, {
+      throw new ApiError("bad_request", "status invÃ¡lido", 400, {
         allowed: Object.values(RENTAL_STATUSES),
       });
     }
@@ -419,9 +419,9 @@ app.post("/api/v1/rentals", async (req, res, next) => {
       prisma.client.findUnique({ where: { id: clientId } }),
       prisma.vehicle.findUnique({ where: { id: vehicleId } }),
     ]);
-    if (!tenant) throw new ApiError("not_found", "tenant não encontrado", 404, { tenantId });
-    if (!client) throw new ApiError("not_found", "client não encontrado", 404, { clientId });
-    if (!vehicle) throw new ApiError("not_found", "vehicle não encontrado", 404, { vehicleId });
+    if (!tenant) throw new ApiError("not_found", "tenant nÃ£o encontrado", 404, { tenantId });
+    if (!client) throw new ApiError("not_found", "client nÃ£o encontrado", 404, { clientId });
+    if (!vehicle) throw new ApiError("not_found", "vehicle nÃ£o encontrado", 404, { vehicleId });
 
     // conflito somente para statuses bloqueantes
     if (isBlockingStatus(rentalStatus)) {
@@ -434,7 +434,7 @@ app.post("/api/v1/rentals", async (req, res, next) => {
         },
       });
       if (conflicting) {
-        throw new ApiError("conflict", "Conflito de agenda para este veículo", 409, {
+        throw new ApiError("conflict", "Conflito de agenda para este veÃ­culo", 409, {
           vehicleId,
           requested: { startDate, endDate },
           conflictWith: {
@@ -447,10 +447,10 @@ app.post("/api/v1/rentals", async (req, res, next) => {
       }
     }
 
-    // amount: usa o enviado OU calcula (diárias × dailyRate)
+    // amount: usa o enviado OU calcula (diÃ¡rias Ã— dailyRate)
     let finalAmount = amount;
     if (finalAmount === undefined || finalAmount === null || String(finalAmount).trim() === "") {
-      const days = Math.max(1, diffDaysUTC(start, end)); // garante pelo menos 1 diária
+      const days = Math.max(1, diffDaysUTC(start, end)); // garante pelo menos 1 diÃ¡ria
       const rate = vehicle.dailyRate ? parseFloat(vehicle.dailyRate) : 0;
       finalAmount = normalizeAmount(days * rate);
     } else {
@@ -482,6 +482,7 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 /* ===================== START ===================== */
+app.use('/api/v1', require('./routes/public-seed'));
 app.listen(PORT, () => {
   console.log(`API rodando em http://localhost:${PORT}`);
   console.log(`Health:    http://localhost:${PORT}/internal/health`);
@@ -501,3 +502,9 @@ app.listen(PORT, () => {
 // teste husky
 // test hook
 // test lint-staged
+
+
+
+
+
+// teste husky 2

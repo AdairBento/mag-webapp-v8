@@ -13,9 +13,7 @@ async function hasConflict(prisma, tenantId, vehicleId, startDate, endDate) {
     },
     select: { id: true, startDate: true, endDate: true, status: true },
   });
-  return candidates.some((r) =>
-    overlaps(startDate, endDate, r.startDate, r.endDate)
-  );
+  return candidates.some((r) => overlaps(startDate, endDate, r.startDate, r.endDate));
 }
 
 async function createRentalAndReserveVehicle(prisma, payload) {

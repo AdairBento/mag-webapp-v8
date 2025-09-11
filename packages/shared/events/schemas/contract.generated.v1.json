@@ -13,9 +13,5 @@
       "format": "uri"
     }
   },
-  "required": [
-    "contractId",
-    "docId",
-    "url"
-  ]
+  "required": ["contractId", "docId", "url"]
 }

@@ -6,7 +6,5 @@
       "type": "string"
     }
   },
-  "required": [
-    "paymentId"
-  ]
+  "required": ["paymentId"]
 }

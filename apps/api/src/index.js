@@ -79,7 +79,11 @@ app.post("/internal/seed", async (_req, res, next) => {
     const tenant = await prisma.tenant.upsert({
       where: { id: "022d0c59-4363-4993-a485-9adf29719824" },
       update: {},
-      create: { id: "022d0c59-4363-4993-a485-9adf29719824", name: "Demo Tenant", domain: "demo.local" },
+      create: {
+        id: "022d0c59-4363-4993-a485-9adf29719824",
+        name: "Demo Tenant",
+        domain: "demo.local",
+      },
     });
 
     const client = await prisma.client.upsert({
@@ -115,7 +119,9 @@ app.post("/internal/seed", async (_req, res, next) => {
     });
 
     res.json({ tenant, client, vehicle });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* ===================== API v1 ===================== */
@@ -125,9 +131,11 @@ const availabilityHandler = async (req, res, next) => {
     res.json({
       data: [],
       pagination: { page: 1, limit: 20, total: 0, pages: 1 },
-      meta: { mode: (req.query.mode || "available"), blockedVehicleCount: 0 },
+      meta: { mode: req.query.mode || "available", blockedVehicleCount: 0 },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, next) => {
@@ -135,8 +143,14 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
     const tenantId = requireNonEmpty(req.query.tenantId, "tenantId");
 
     const { startDate, endDate } = req.query;
-    const start = (req.availabilityWindow && req.availabilityWindow.start) ? req.availabilityWindow.start : new Date(startDate);
-    const end   = (req.availabilityWindow && req.availabilityWindow.end)   ? req.availabilityWindow.end   : new Date(endDate);
+    const start =
+      req.availabilityWindow && req.availabilityWindow.start
+        ? req.availabilityWindow.start
+        : new Date(startDate);
+    const end =
+      req.availabilityWindow && req.availabilityWindow.end
+        ? req.availabilityWindow.end
+        : new Date(endDate);
 
     const { page, limit, skip } = getPaging(req);
 
@@ -148,15 +162,12 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
       where: {
         tenantId,
         status: { in: blockingStatuses },
-        NOT: [
-          { endDate:   { lte: start } },
-          { startDate: { gte: end   } },
-        ],
+        NOT: [{ endDate: { lte: start } }, { startDate: { gte: end } }],
       },
       select: { vehicleId: true },
     });
 
-    const blockedIds = [...new Set(overlapping.map(r => r.vehicleId))];
+    const blockedIds = [...new Set(overlapping.map((r) => r.vehicleId))];
 
     // Disponíveis = available - bloqueados no range
     const mode = String(req.query.mode || "available").toLowerCase();
@@ -177,7 +188,8 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
     const [data, total] = await Promise.all([
       prisma.vehicle.findMany({
         where: vehicleWhere,
-        skip, take: limit,
+        skip,
+        take: limit,
         orderBy: { createdAt: "desc" },
       }),
       prisma.vehicle.count({ where: vehicleWhere }),
@@ -187,7 +199,7 @@ app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, ne
       data,
       pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
       meta: {
-        mode: (req.query.mode || "available"),
+        mode: req.query.mode || "available",
         blockedVehicleCount: blockedIds.length,
         window: { startDate: req.query.startDate, endDate: req.query.endDate },
       },
@@ -203,37 +215,50 @@ app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
 app.get("/api/v1/clients", async (req, res, next) => {
   try {
     const { tenantId } = req.query;
-    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+    if (!tenantId)
+      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
 
     const { page, limit, skip } = getPaging(req);
     const [items, total] = await Promise.all([
       prisma.client.findMany({ where: { tenantId }, skip, take: limit }),
       prisma.client.count({ where: { tenantId } }),
     ]);
-    res.json({ data: items, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
-  } catch (err) { next(err); }
+    res.json({
+      data: items,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Vehicles (GET com paginação)
 app.get("/api/v1/vehicles", async (req, res, next) => {
   try {
     const { tenantId } = req.query;
-    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+    if (!tenantId)
+      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
 
     const { page, limit, skip } = getPaging(req);
     const [items, total] = await Promise.all([
       prisma.vehicle.findMany({ where: { tenantId }, skip, take: limit }),
       prisma.vehicle.count({ where: { tenantId } }),
     ]);
-    res.json({ data: items, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
-  } catch (err) { next(err); }
+    res.json({
+      data: items,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Rentals (GET com paginação + filtros opcionais)
 app.get("/api/v1/rentals", async (req, res, next) => {
   try {
     const { tenantId, status, startFrom, endTo } = req.query;
-    if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+    if (!tenantId)
+      return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
 
     if (status && !isValidStatus(status)) {
       return res.status(400).json({
@@ -252,7 +277,8 @@ app.get("/api/v1/rentals", async (req, res, next) => {
 
     const where = { tenantId };
     if (status) where.status = status;
-    if (startFrom) where.startDate = Object.assign(where.startDate ?? {}, { gte: new Date(startFrom) });
+    if (startFrom)
+      where.startDate = Object.assign(where.startDate ?? {}, { gte: new Date(startFrom) });
     if (endTo) where.endDate = Object.assign(where.endDate ?? {}, { lte: new Date(endTo) });
 
     const { page, limit, skip } = getPaging(req);
@@ -276,7 +302,9 @@ app.get("/api/v1/rentals", async (req, res, next) => {
       pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
       filters: { status: status || null, startFrom: startFrom || null, endTo: endTo || null },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Rentals (GET por id)
@@ -285,7 +313,9 @@ app.get("/api/v1/rentals/:id", async (req, res, next) => {
     const rental = await prisma.rental.findUnique({ where: { id: req.params.id } });
     if (!rental) return res.status(404).json({ error: "not_found", message: "not_found" });
     res.json({ data: rental });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* ===================== CREATES (POST) ===================== */
@@ -310,24 +340,28 @@ app.post("/api/v1/clients", async (req, res, next) => {
     });
 
     res.status(201).json({ data: client });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/v1/vehicles
 app.post("/api/v1/vehicles", async (req, res, next) => {
   try {
-    const { tenantId, plate, brand, model, year, dailyRate, status, color, fuelType, category } = req.body || {};
+    const { tenantId, plate, brand, model, year, dailyRate, status, color, fuelType, category } =
+      req.body || {};
     requireNonEmpty(tenantId, "tenantId");
     requireNonEmpty(plate, "plate");
     requireNonEmpty(brand, "brand");
     requireNonEmpty(model, "model");
     requireNonEmpty(year, "year");
 
-    const normalizedRate = (dailyRate !== undefined && dailyRate !== null) ? normalizeAmount(dailyRate) : null;
+    const normalizedRate =
+      dailyRate !== undefined && dailyRate !== null ? normalizeAmount(dailyRate) : null;
 
-    const color_    = (((color    ?? "Prata") + "").trim())   || "Prata";
-    const fuelType_ = (((fuelType ?? "Flex") + "").trim())    || "Flex";
-    const category_ = (((category ?? "Hatch") + "").trim())   || "Hatch";
+    const color_ = ((color ?? "Prata") + "").trim() || "Prata";
+    const fuelType_ = ((fuelType ?? "Flex") + "").trim() || "Flex";
+    const category_ = ((category ?? "Hatch") + "").trim() || "Hatch";
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -345,7 +379,9 @@ app.post("/api/v1/vehicles", async (req, res, next) => {
     });
 
     res.status(201).json({ data: vehicle });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/v1/rentals
@@ -363,12 +399,17 @@ app.post("/api/v1/rentals", async (req, res, next) => {
     const start = toDate(startDate);
     const end = toDate(endDate);
     if (end <= start) {
-      throw new ApiError("bad_request", "endDate deve ser maior que startDate", 400, { startDate, endDate });
+      throw new ApiError("bad_request", "endDate deve ser maior que startDate", 400, {
+        startDate,
+        endDate,
+      });
     }
 
     const rentalStatus = status || RENTAL_STATUSES.CONFIRMED;
     if (!isValidStatus(rentalStatus)) {
-      throw new ApiError("bad_request", "status inválido", 400, { allowed: Object.values(RENTAL_STATUSES) });
+      throw new ApiError("bad_request", "status inválido", 400, {
+        allowed: Object.values(RENTAL_STATUSES),
+      });
     }
 
     // valida entidades
@@ -395,7 +436,12 @@ app.post("/api/v1/rentals", async (req, res, next) => {
         throw new ApiError("conflict", "Conflito de agenda para este veículo", 409, {
           vehicleId,
           requested: { startDate, endDate },
-          conflictWith: { id: conflicting.id, startDate: conflicting.startDate, endDate: conflicting.endDate, status: conflicting.status },
+          conflictWith: {
+            id: conflicting.id,
+            startDate: conflicting.startDate,
+            endDate: conflicting.endDate,
+            status: conflicting.status,
+          },
         });
       }
     }
@@ -412,15 +458,20 @@ app.post("/api/v1/rentals", async (req, res, next) => {
 
     const rental = await prisma.rental.create({
       data: {
-        tenantId, clientId, vehicleId,
-        startDate: start, endDate: end,
+        tenantId,
+        clientId,
+        vehicleId,
+        startDate: start,
+        endDate: end,
         status: rentalStatus,
         amount: finalAmount,
       },
     });
 
     res.status(201).json({ data: rental });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* ===================== 404 & ERROR ===================== */
@@ -438,6 +489,7 @@ app.listen(PORT, () => {
   console.log(`Clients:  http://localhost:${PORT}/api/v1/clients?tenantId=...&page=1&limit=20`);
   console.log(`Vehicles: http://localhost:${PORT}/api/v1/vehicles?tenantId=...&page=1&limit=20`);
   console.log(`Rentals:  http://localhost:${PORT}/api/v1/rentals?tenantId=...&page=1&limit=20`);
-  console.log(`Avail.:   http://localhost:${PORT}/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`);
+  console.log(
+    `Avail.:   http://localhost:${PORT}/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`,
+  );
 });
-

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-unused-vars */
 const { execSync } = require("node:child_process");
 
 const cmds = [
@@ -11,8 +12,8 @@ const cmds = [
 for (const c of cmds) {
   console.log(`\n⚡ ${c}`);
   try {
-    const out = execSync(c, { stdio: "inherit", shell: true });
-  } catch (e) {
+    const _out = execSync(c, { stdio: "inherit", shell: true });
+  } catch (_e) {
     // segue adiante para ver todas as saídas
   }
 }

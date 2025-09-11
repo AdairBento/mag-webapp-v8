@@ -1,8 +1,8 @@
 ﻿const RENTAL_STATUSES = {
-  PENDING: 'pending',
-  CONFIRMED: 'confirmed',
-  COMPLETED: 'completed',
-  CANCELED: 'canceled'
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELED: "canceled",
 };
 
 function isValidStatus(status) {
@@ -10,12 +10,12 @@ function isValidStatus(status) {
 }
 
 function isBlockingStatus(status) {
-  return status === 'confirmed';
+  return status === "confirmed";
 }
 
-module.exports = { 
-  RENTAL_STATUSES, 
-  isValidStatus, 
-  isBlockingStatus 
+module.exports = {
+  RENTAL_STATUSES,
+  isValidStatus,
+  isBlockingStatus,
 };
 // touch

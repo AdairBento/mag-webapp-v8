@@ -16,10 +16,5 @@
       "format": "date-time"
     }
   },
-  "required": [
-    "notificationId",
-    "channel",
-    "status",
-    "sentAt"
-  ]
+  "required": ["notificationId", "channel", "status", "sentAt"]
 }

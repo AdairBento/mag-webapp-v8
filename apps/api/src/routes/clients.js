@@ -25,7 +25,9 @@ router.get("/clients", async (req, res, next) => {
     ]);
 
     res.json({ data, page, limit, total });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post("/clients", async (req, res, next) => {
@@ -34,10 +36,16 @@ router.post("/clients", async (req, res, next) => {
     const { name, email, phone, document } = req.body || {};
 
     if (!name || !email) {
-      const e = new Error("name and email are required"); e.status = 400; throw e;
+      const e = new Error("name and email are required");
+      e.status = 400;
+      throw e;
     }
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) { const e = new Error("invalid email"); e.status = 400; throw e; }
+    if (!emailOk) {
+      const e = new Error("invalid email");
+      e.status = 400;
+      throw e;
+    }
 
     const created = await prisma.client.create({
       data: { tenantId, name, email, phone, document },
@@ -45,7 +53,8 @@ router.post("/clients", async (req, res, next) => {
     res.status(201).json(created);
   } catch (err) {
     if (String(err.message).includes("Unique constraint")) {
-      err.status = 409; err.message = "email already exists";
+      err.status = 409;
+      err.message = "email already exists";
     }
     next(err);
   }

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "nodemon mag-webapp-v8-integrated/apps/api/src/index.js",
     "lint": "eslint .",
-    "format": "prettier --write .",
+    "format": "prettier \"{apps,packages}/**/*.{js,mjs,cjs,ts,tsx,json,yml,yaml,html,css,scss,less,hbs}\" --write",
     "test": "jest",
     "coverage": "nyc npm test",
     "docs:openapi": "node scripts/generate-openapi.cjs",
@@ -26,7 +26,7 @@
     "deps:check": "npm outdated",
     "deps:unused": "npx depcheck",
     "lint:check": "eslint . --max-warnings 0",
-    "format:check": "prettier . --check",
+    "format:check": "prettier \"{apps,packages}/**/*.{js,mjs,cjs,ts,tsx,json,yml,yaml,html,css,scss,less,hbs}\" --check",
     "fix-all": "npm run lint:fix && npm run format",
     "debug:api": "node --inspect apps/api/src/index.js",
     "prepare": "husky"

@@ -20,11 +20,5 @@
       "format": "date-time"
     }
   },
-  "required": [
-    "docId",
-    "tenantId",
-    "docType",
-    "url",
-    "createdAt"
-  ]
+  "required": ["docId", "tenantId", "docType", "url", "createdAt"]
 }

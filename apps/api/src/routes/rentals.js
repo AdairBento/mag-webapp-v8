@@ -27,44 +27,73 @@ router.get("/rentals", async (req, res, next) => {
         skip,
         take: limit,
         include: {
-          client:  { select: { id: true, name: true, email: true } },
+          client: { select: { id: true, name: true, email: true } },
           vehicle: { select: { id: true, plate: true, model: true, brand: true } },
         },
       }),
     ]);
 
     res.json({ data, page, limit, total });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post("/rentals", async (req, res, next) => {
   try {
     const tenantId = req.tenantId;
-    const { clientId, vehicleId, startDate: startRaw, endDate: endRaw, status, price, notes } = req.body || {};
+    const {
+      clientId,
+      vehicleId,
+      startDate: startRaw,
+      endDate: endRaw,
+      status,
+      price,
+      notes,
+    } = req.body || {};
 
     if (!clientId || !vehicleId || !startRaw || !endRaw) {
-      const e = new Error("clientId, vehicleId, startDate, endDate are required"); e.status = 400; throw e;
+      const e = new Error("clientId, vehicleId, startDate, endDate are required");
+      e.status = 400;
+      throw e;
     }
 
     const startDate = parseIsoDate(startRaw);
-    const endDate   = parseIsoDate(endRaw);
+    const endDate = parseIsoDate(endRaw);
     if (!startDate || !endDate || startDate >= endDate) {
-      const e = new Error("invalid date range"); e.status = 400; throw e;
+      const e = new Error("invalid date range");
+      e.status = 400;
+      throw e;
     }
 
     const [client, vehicle] = await Promise.all([
       prisma.client.findFirst({ where: { id: clientId, tenantId } }),
       prisma.vehicle.findFirst({ where: { id: vehicleId, tenantId } }),
     ]);
-    if (!client)  { const e = new Error("client not found in tenant");  e.status = 404; throw e; }
-    if (!vehicle) { const e = new Error("vehicle not found in tenant"); e.status = 404; throw e; }
+    if (!client) {
+      const e = new Error("client not found in tenant");
+      e.status = 404;
+      throw e;
+    }
+    if (!vehicle) {
+      const e = new Error("vehicle not found in tenant");
+      e.status = 404;
+      throw e;
+    }
 
     const conflict = await hasConflict(prisma, tenantId, vehicleId, startDate, endDate);
-    if (conflict) { const e = new Error("rental conflict for this vehicle and period"); e.status = 409; throw e; }
+    if (conflict) {
+      const e = new Error("rental conflict for this vehicle and period");
+      e.status = 409;
+      throw e;
+    }
 
     const payload = {
-      tenantId, clientId, vehicleId,
-      startDate, endDate,
+      tenantId,
+      clientId,
+      vehicleId,
+      startDate,
+      endDate,
       status: status || "reserved",
       price: price != null ? Number(price) : null,
       notes: notes || null,
@@ -72,7 +101,9 @@ router.post("/rentals", async (req, res, next) => {
 
     const rental = await createRentalAndReserveVehicle(prisma, payload);
     res.status(201).json(rental);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

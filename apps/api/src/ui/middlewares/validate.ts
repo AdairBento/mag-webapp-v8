@@ -7,7 +7,7 @@ export const validate = (schema: z.ZodSchema) => {
       const validatedData = schema.parse({
         ...req.body,
         ...req.query,
-        ...req.params
+        ...req.params,
       });
 
       Object.assign(req.body, validatedData);
@@ -20,11 +20,11 @@ export const validate = (schema: z.ZodSchema) => {
         return res.status(400).json({
           error: "validation failed",
           code: "VALIDATION_ERROR",
-          details: error.errors.map(err => ({
+          details: error.errors.map((err) => ({
             field: err.path.join("."),
             message: err.message,
-            code: err.code
-          }))
+            code: err.code,
+          })),
         });
       }
       next(error);

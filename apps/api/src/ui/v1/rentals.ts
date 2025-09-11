@@ -18,7 +18,7 @@ async function findConflict({ vehicleId, start, end, excludeId = null }) {
       vehicleId: String(vehicleId),
       // conflito clássico: começa antes do fim E termina depois do início
       startDate: { lt: end },
-      endDate:   { gt: start },
+      endDate: { gt: start },
       // regra atual: só 'confirmed' bloqueia agenda
       status: { in: ["confirmed"] },
       ...(excludeId ? { NOT: { id: String(excludeId) } } : {}),
@@ -40,15 +40,16 @@ router.get("/", async (req, res) => {
 
     const where = {};
     if (req.query.tenantId) where.tenantId = String(req.query.tenantId);
-    if (req.query.status)   where.status   = String(req.query.status);
+    if (req.query.status) where.status = String(req.query.status);
 
     // filtros de período (opcionais)
     const startFrom = req.query.startFrom ? new Date(req.query.startFrom) : null; // >= startDate
-    const endTo     = req.query.endTo     ? new Date(req.query.endTo)     : null; // <= endDate
-    if ((!Number.isNaN(startFrom?.getTime())) || (!Number.isNaN(endTo?.getTime()))) {
+    const endTo = req.query.endTo ? new Date(req.query.endTo) : null; // <= endDate
+    if (!Number.isNaN(startFrom?.getTime()) || !Number.isNaN(endTo?.getTime())) {
       where.AND = [];
-      if (startFrom && !Number.isNaN(startFrom.getTime())) where.AND.push({ startDate: { gte: startFrom } });
-      if (endTo     && !Number.isNaN(endTo.getTime()))     where.AND.push({ endDate:   { lte: endTo } });
+      if (startFrom && !Number.isNaN(startFrom.getTime()))
+        where.AND.push({ startDate: { gte: startFrom } });
+      if (endTo && !Number.isNaN(endTo.getTime())) where.AND.push({ endDate: { lte: endTo } });
     }
 
     const [total, data] = await Promise.all([
@@ -111,14 +112,20 @@ router.post("/", async (req, res) => {
 
     const missing = [];
     for (const [k, v] of Object.entries({
-      tenantId, clientId, vehicleId, startDate, endDate, amount,
-    })) if (!v) missing.push(k);
+      tenantId,
+      clientId,
+      vehicleId,
+      startDate,
+      endDate,
+      amount,
+    }))
+      if (!v) missing.push(k);
     if (missing.length) return res.status(400).json({ error: "missing_fields", fields: missing });
 
     const sDate = coerceIsoDate(startDate);
     const eDate = coerceIsoDate(endDate);
     if (!sDate || !eDate) return res.status(400).json({ error: "invalid_date" });
-    if (eDate <= sDate)   return res.status(400).json({ error: "endDate_must_be_after_startDate" });
+    if (eDate <= sDate) return res.status(400).json({ error: "endDate_must_be_after_startDate" });
 
     // existência
     const [tenant, client, vehicle] = await Promise.all([
@@ -126,8 +133,8 @@ router.post("/", async (req, res) => {
       prisma.client.findUnique({ where: { id: String(clientId) } }),
       prisma.vehicle.findUnique({ where: { id: String(vehicleId) } }),
     ]);
-    if (!tenant)  return res.status(400).json({ error: "tenant_not_found" });
-    if (!client)  return res.status(400).json({ error: "client_not_found" });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
+    if (!client) return res.status(400).json({ error: "client_not_found" });
     if (!vehicle) return res.status(400).json({ error: "vehicle_not_found" });
 
     // conflito (considera somente 'confirmed' conforme regra atual)
@@ -160,8 +167,10 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const id = String(req.params.id);
-    const bodyStatus = typeof req.body?.status !== "undefined" ? String(req.body.status) : undefined;
-    const bodyEnd    = typeof req.body?.endDate !== "undefined" ? coerceIsoDate(req.body.endDate) : undefined;
+    const bodyStatus =
+      typeof req.body?.status !== "undefined" ? String(req.body.status) : undefined;
+    const bodyEnd =
+      typeof req.body?.endDate !== "undefined" ? coerceIsoDate(req.body.endDate) : undefined;
 
     // carrega o atual uma vez só
     const current = await prisma.rental.findUnique({ where: { id } });
@@ -190,7 +199,7 @@ router.patch("/:id", async (req, res) => {
 
     // estado final após aplicar o patch
     const finalStatus = typeof payload.status !== "undefined" ? payload.status : current.status;
-    const finalEnd    = typeof payload.endDate !== "undefined" ? payload.endDate : current.endDate;
+    const finalEnd = typeof payload.endDate !== "undefined" ? payload.endDate : current.endDate;
 
     // regra: somente 'confirmed' bloqueia agenda
     if (finalStatus === "confirmed") {

@@ -8,7 +8,7 @@ export function errorHandler(logger: pino.Logger) {
     logger.error({ err, status }, "unhandled_error");
     res.status(status).json({
       error: err?.message || "internal_error",
-      details: process.env.NODE_ENV === "development" ? err : undefined
+      details: process.env.NODE_ENV === "development" ? err : undefined,
     });
   };
 }

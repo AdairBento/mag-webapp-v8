@@ -10,13 +10,13 @@ export const rateLimiter = () => {
     message: {
       error: "too many requests",
       code: "RATE_LIMIT_EXCEEDED",
-      retryAfter: Math.ceil(windowMs / 1000)
+      retryAfter: Math.ceil(windowMs / 1000),
     },
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: any) => {
       const tenantId = (req.tenantId as string) || "default";
       return `${req.ip}:${tenantId}`;
-    }
+    },
   });
 };

@@ -28,7 +28,9 @@ router.get("/vehicles", async (req, res, next) => {
     ]);
 
     res.json({ data, page, limit, total });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post("/vehicles", async (req, res, next) => {
@@ -37,19 +39,31 @@ router.post("/vehicles", async (req, res, next) => {
     let { plate, brand, model, year, status, dailyRate } = req.body || {};
 
     if (!plate || !brand || !model || !year) {
-      const e = new Error("plate, brand, model, year are required"); e.status = 400; throw e;
+      const e = new Error("plate, brand, model, year are required");
+      e.status = 400;
+      throw e;
     }
-    if (!isPlate(plate)) { const e = new Error("invalid plate"); e.status = 400; throw e; }
+    if (!isPlate(plate)) {
+      const e = new Error("invalid plate");
+      e.status = 400;
+      throw e;
+    }
 
     plate = plate.toUpperCase();
     year = parseInt(year, 10);
     if (!Number.isFinite(year) || year < 1950) {
-      const e = new Error("invalid year"); e.status = 400; throw e;
+      const e = new Error("invalid year");
+      e.status = 400;
+      throw e;
     }
 
     const created = await prisma.vehicle.create({
       data: {
-        tenantId, plate, brand, model, year,
+        tenantId,
+        plate,
+        brand,
+        model,
+        year,
         status: status || "available",
         dailyRate: dailyRate != null ? Number(dailyRate) : null,
       },
@@ -57,7 +71,8 @@ router.post("/vehicles", async (req, res, next) => {
     res.status(201).json(created);
   } catch (err) {
     if (String(err.message).includes("Unique constraint")) {
-      err.status = 409; err.message = "plate already exists";
+      err.status = 409;
+      err.message = "plate already exists";
     }
     next(err);
   }

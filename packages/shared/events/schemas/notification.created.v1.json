@@ -19,11 +19,5 @@
       "format": "date-time"
     }
   },
-  "required": [
-    "notificationId",
-    "tenantId",
-    "type",
-    "title",
-    "createdAt"
-  ]
+  "required": ["notificationId", "tenantId", "type", "title", "createdAt"]
 }

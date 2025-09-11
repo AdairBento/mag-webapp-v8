@@ -6,7 +6,5 @@
       "type": "string"
     }
   },
-  "required": [
-    "vehicleId"
-  ]
+  "required": ["vehicleId"]
 }

@@ -1,24 +1,27 @@
-/* eslint-disable no-unused-vars */
 function createHealthHandler({ prisma } = {}) {
-  return async (_req, res) => {
-    const checks = {
-      system: { status: "ok", message: "System OK" },
-      database: { status: "skip", message: "No Prisma provided" },
+  return async (req, res) => {
+    const out = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime_ms: Math.floor(process.uptime() * 1000),
+      checks: { system: "ok", database: "" }
     };
-    if (prisma?.$queryRaw) {
+
+    // Se houver Prisma, tenta um ping simples
+    if (prisma && typeof prisma.$queryRaw === "function") {
       try {
-        const _unused = await prisma.$queryRaw`SELECT 1`;
-        checks.database = { status: "ok", message: "Database OK" };
+        // SELECT 1 compatível; ajuste se seu client exigir outra forma
+        await prisma.$queryRaw`SELECT 1`;
+        out.checks.database = "ok";
       } catch (e) {
-        checks.database = { status: "error", message: e?.message || "DB error" };
+        out.checks.database = "error";
+        out.status = "degraded";
+        out.error = String(e?.message || e);
       }
     }
-    res.json({
-      status: checks.database.status === "error" ? "error" : "ok",
-      timestamp: new Date().toISOString(),
-      uptime_ms: Math.round(process.uptime() * 1000),
-      checks,
-    });
+
+    res.json(out);
   };
 }
-module.exports = { createHealthHandler };
+
+module.exports = createHealthHandler;

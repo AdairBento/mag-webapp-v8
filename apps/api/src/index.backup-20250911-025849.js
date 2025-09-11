@@ -1,5 +1,4 @@
-const createHealthHandler = require('./health-extended');
-// src/index.js
+﻿// src/index.js
 // MAG API — Express + Prisma (alias availability, paginação, CORS/Helmet, filtros e POSTs + cálculo de amount)
 
 require("dotenv/config");
@@ -9,6 +8,7 @@ const helmet = require("helmet");
 const { PrismaClient } = require("@prisma/client");
 const { addTraceId, httpLogger } = require("./middleware-logger");
 const { errorHandler, ApiError } = require("./middleware-errors");
+const { createHealthHandler } = require("./health-extended");
 const { normalizeAvailabilityParams } = require("./availability-alias");
 const { RENTAL_STATUSES, isValidStatus, isBlockingStatus } = require("./utils-status");
 const { normalizeAmount } = require("./utils-amount");
@@ -21,7 +21,6 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(helmet());
 app.use(cors()); // ajuste: cors({ origin: ["http://localhost:5173"] })
 app.use(express.json());
-app.use("/internal", require("./ui/internal"));
 app.use(addTraceId);
 app.use(httpLogger);
 
@@ -494,6 +493,3 @@ app.listen(PORT, () => {
     `Avail.:   http://localhost:${PORT}/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`,
   );
 });
-
-
-

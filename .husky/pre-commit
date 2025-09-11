@@ -1,3 +1,1 @@
-#!/usr/bin/env sh
-echo "Running lint-staged..."
-npx --no-install lint-staged
+npx lint-staged

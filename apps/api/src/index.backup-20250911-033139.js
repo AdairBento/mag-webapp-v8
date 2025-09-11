@@ -21,7 +21,6 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(helmet());
 app.use(cors()); // ajuste: cors({ origin: ["http://localhost:5173"] })
 app.use(express.json());
-app.use("/internal", require("./ui/internal"));
 app.use(addTraceId);
 app.use(httpLogger);
 
@@ -494,6 +493,4 @@ app.listen(PORT, () => {
     `Avail.:   http://localhost:${PORT}/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`,
   );
 });
-
-
 

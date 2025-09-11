@@ -494,6 +494,7 @@ app.listen(PORT, () => {
     `Avail.:   http://localhost:${PORT}/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD`,
   );
 });
+app.use("/internal", require("./ui/internal"));
 
 
 

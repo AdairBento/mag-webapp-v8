@@ -1,0 +1,15 @@
+API rodando em http://localhost:3000
+Health:    http://localhost:3000/internal/health
+Extended:  http://localhost:3000/internal/health/extended
+Seed:     POST http://localhost:3000/internal/seed
+Clients:  http://localhost:3000/api/v1/clients?tenantId=...&page=1&limit=20
+Vehicles: http://localhost:3000/api/v1/vehicles?tenantId=...&page=1&limit=20
+Rentals:  http://localhost:3000/api/v1/rentals?tenantId=...&page=1&limit=20
+Avail.:   http://localhost:3000/api/v1/availability?from=YYYY-MM-DD&to=YYYY-MM-DD
+GET /internal/health -> 200 (12ms) [traceId=060ddfff-7996-429f-b176-be4264460281]
+GET /internal/health -> 200 (2ms) [traceId=7d2b33d2-4eba-4bd5-94d8-bb299f2d9c11]
+GET /internal/health/extended -> 200 (7ms) [traceId=7357e537-0892-4665-aab8-744e4256caac]
+GET /internal/clients -> 404 (2ms) [traceId=126556c1-6cad-4dad-8c55-e04848aa8dc5]
+GET /api/v1/clients?tenantId=&page=1&limit=20 -> 400 (1ms) [traceId=d87b2651-4702-4a18-8dee-2a2dd21fbb4d]
+GET /api/v1/vehicles?tenantId=&page=1&limit=20 -> 400 (1ms) [traceId=083eee3e-da53-4a72-86f6-65ca414cd303]
+GET /api/v1/rentals?tenantId=&page=1&limit=20 -> 400 (1ms) [traceId=9b00765e-dc23-4b1b-85d3-a36eb8d1849a]

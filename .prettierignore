@@ -1,12 +1,5 @@
 node_modules
 dist
-build
 coverage
-apps/api/src/index.backup-helpers.js
-audit-reports/
-deploy/
-docs/
-apps/api/src/index.backup-helpers.js
-audit-reports/
-deploy/
-docs/
+logs
+*.log

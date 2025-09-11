@@ -1,4 +1,5 @@
 # Retry Policies
+
 - Estratégia: Exponential backoff + jitter
 - Tentativas: 3
 - Backoff base: 200 ms (máx 2 s)

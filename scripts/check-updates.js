@@ -6,7 +6,7 @@ const cmds = [
   "npm audit --audit-level=moderate || exit 0",
   "npm outdated || exit 0",
   "npm test -- --passWithNoTests || exit 0",
-  "npm run lint || exit 0"
+  "npm run lint || exit 0",
 ];
 
 for (const c of cmds) {

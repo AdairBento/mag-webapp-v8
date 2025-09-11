@@ -4,7 +4,8 @@ import pluginN from "eslint-plugin-n";
 import pluginPromise from "eslint-plugin-promise";
 
 export default [
-  { // arquivos/dirs a ignorar
+  {
+    // arquivos/dirs a ignorar
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
@@ -13,8 +14,8 @@ export default [
       "**/audit-reports/**",
       "eslint.config.*",
       "scripts/**/*.ps1",
-      "apps/api/src/index.backup-helpers.js"
-    ]
+      "apps/api/src/index.backup-helpers.js",
+    ],
   },
   js.configs.recommended,
   {
@@ -28,15 +29,15 @@ export default [
         process: "readonly",
         console: "readonly",
         __dirname: "readonly",
-        __filename: "readonly"
-      }
+        __filename: "readonly",
+      },
     },
     plugins: { import: pluginImport, n: pluginN, promise: pluginPromise },
     rules: {
-      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "import/no-unresolved": "off",
       "n/no-missing-import": "off",
-      "promise/no-nesting": "off"
-    }
-  }
+      "promise/no-nesting": "off",
+    },
+  },
 ];

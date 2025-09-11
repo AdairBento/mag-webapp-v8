@@ -34,12 +34,12 @@ paths:
           name: limit
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedRentals'
+                $ref: "#/components/schemas/PaginatedRentals"
     post:
       tags: [Rentals]
       summary: Cria um aluguel
@@ -48,14 +48,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateRentalRequest'
+              $ref: "#/components/schemas/CreateRentalRequest"
       responses:
-        '201':
+        "201":
           description: Criado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateRentalResponse'
+                $ref: "#/components/schemas/CreateRentalResponse"
   /rentals/{rentalId}:
     get:
       tags: [Rentals]
@@ -66,11 +66,11 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Rental' }
+              schema: { $ref: "#/components/schemas/Rental" }
   /rentals/{rentalId}/confirm:
     post:
       tags: [Rentals]
@@ -81,7 +81,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        "200":
           description: Confirmado
   /rentals/{rentalId}/return:
     post:
@@ -102,7 +102,7 @@ paths:
                 returnLocation: { type: string }
                 returnDate: { type: string, format: date-time }
       responses:
-        '200': { description: OK }
+        "200": { description: OK }
   /vehicles:
     get:
       tags: [Vehicles]
@@ -112,7 +112,7 @@ paths:
           name: status
           schema: { type: string, enum: [available, rented, maintenance] }
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -121,13 +121,13 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/Vehicle' }
+                    items: { $ref: "#/components/schemas/Vehicle" }
   /clients:
     get:
       tags: [Clients]
       summary: Lista clientes
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -136,7 +136,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/Client' }
+                    items: { $ref: "#/components/schemas/Client" }
     post:
       tags: [Clients]
       summary: Cria cliente
@@ -144,9 +144,9 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateClientRequest' }
+            schema: { $ref: "#/components/schemas/CreateClientRequest" }
       responses:
-        '201': { description: Criado }
+        "201": { description: Criado }
   /payments/charge:
     post:
       tags: [Payments]
@@ -161,7 +161,7 @@ paths:
                 rentalId: { type: string }
                 method: { type: string, enum: [pix, credit_card, boleto] }
       responses:
-        '202': { description: Aceito }
+        "202": { description: Aceito }
   /reports/revenue:
     get:
       tags: [Reports]
@@ -176,7 +176,7 @@ paths:
           required: true
           schema: { type: string, format: date }
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
@@ -191,13 +191,13 @@ paths:
       tags: [Internal]
       summary: Health Check
       responses:
-        '200': { description: OK }
+        "200": { description: OK }
   /internal/metrics:
     get:
       tags: [Internal]
       summary: Métricas Prometheus
       responses:
-        '200': { description: OK }
+        "200": { description: OK }
 components:
   schemas:
     Money:
@@ -219,28 +219,28 @@ components:
         model: { type: string }
         plate: { type: string }
         year: { type: integer }
-        dailyRate: { $ref: '#/components/schemas/Money' }
+        dailyRate: { $ref: "#/components/schemas/Money" }
         status: { type: string, enum: [available, rented, maintenance] }
     Rental:
       type: object
       properties:
         id: { type: string }
-        client: { $ref: '#/components/schemas/Client' }
-        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        client: { $ref: "#/components/schemas/Client" }
+        vehicle: { $ref: "#/components/schemas/Vehicle" }
         period:
           type: object
           properties:
             start: { type: string, format: date-time }
             end: { type: string, format: date-time }
         status: { type: string, enum: [pending, active, overdue, completed, cancelled] }
-        amount: { $ref: '#/components/schemas/Money' }
+        amount: { $ref: "#/components/schemas/Money" }
         isOverdue: { type: boolean }
     PaginatedRentals:
       type: object
       properties:
         data:
           type: array
-          items: { $ref: '#/components/schemas/Rental' }
+          items: { $ref: "#/components/schemas/Rental" }
         pagination:
           type: object
           properties:

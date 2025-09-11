@@ -32,9 +32,7 @@
   },
   "Dependencies": {
     "Unused": {
-      "Dependencies": [
-        "express"
-      ],
+      "Dependencies": ["express"],
       "DevDependencies": [
         "depcheck",
         "eslint-config-prettier",
@@ -140,9 +138,7 @@
   },
   "Performance": {
     "OptimizationScripts": [],
-    "Suggestions": [
-      "Configure scripts de build/otimização no package.json."
-    ],
+    "Suggestions": ["Configure scripts de build/otimização no package.json."],
     "NodeModulesSize": 436.78
   },
   "Summary": {

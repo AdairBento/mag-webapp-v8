@@ -128,14 +128,8 @@
     },
     "Licenses": "Ôö£ÔöÇ MIT: 872\nÔö£ÔöÇ Apache-2.0: 165\nÔö£ÔöÇ ISC: 91\nÔö£ÔöÇ BSD-3-Clause: 40\nÔö£ÔöÇ BSD-2-Clause: 24\nÔö£ÔöÇ MPL-2.0: 11\nÔö£ÔöÇ UNKNOWN: 4\nÔö£ÔöÇ BlueOak-1.0.0: 3\nÔö£ÔöÇ 0BSD: 2\nÔö£ÔöÇ (MIT OR CC0-1.0): 2\nÔö£ÔöÇ UNLICENSED: 1\nÔö£ÔöÇ Python-2.0: 1\nÔö£ÔöÇ Custom: https://circleci.com/gh/artilleryio/artillery-plugin-expect/tree/master.svg: 1\nÔö£ÔöÇ MIT*: 1\nÔö£ÔöÇ CC-BY-4.0: 1\nÔö£ÔöÇ Unlicense: 1\nÔö£ÔöÇ (BSD-2-Clause OR MIT OR Apache-2.0): 1\nÔö£ÔöÇ CC-BY-3.0: 1\nÔö£ÔöÇ CC0-1.0: 1\nÔö£ÔöÇ (MIT AND CC-BY-3.0): 1\nÔööÔöÇ WTFPL: 1\n\n",
     "Unused": {
-      "Dependencies": [
-        "express"
-      ],
-      "DevDependencies": [
-        "depcheck",
-        "swagger-jsdoc",
-        "swagger-ui-express"
-      ],
+      "Dependencies": ["express"],
+      "DevDependencies": ["depcheck", "swagger-jsdoc", "swagger-ui-express"],
       "Count": 4
     }
   },
@@ -145,9 +139,7 @@
   "Performance": {
     "NodeModulesSize": 427.07,
     "OptimizationScripts": [],
-    "Suggestions": [
-      "Configure scripts de build/otimização no package.json."
-    ]
+    "Suggestions": ["Configure scripts de build/otimização no package.json."]
   },
   "Summary": {
     "Duration": "02:26",

@@ -1,4 +1,5 @@
 # Circuit Breaker
+
 - Janela: 60s
 - Volume mínimo: 20
 - Threshold erro: 50%

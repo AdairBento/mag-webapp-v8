@@ -4,7 +4,7 @@ function createHealthHandler({ prisma } = {}) {
       status: "ok",
       timestamp: new Date().toISOString(),
       uptime_ms: Math.floor(process.uptime() * 1000),
-      checks: { system: "ok", database: "" }
+      checks: { system: "ok", database: "" },
     };
 
     // Se houver Prisma, tenta um ping simples

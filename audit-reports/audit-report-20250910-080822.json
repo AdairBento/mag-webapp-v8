@@ -45,9 +45,7 @@
     "Success": false
   },
   "Performance": {
-    "Suggestions": [
-      "Configure scripts de build/otimização no package.json."
-    ],
+    "Suggestions": ["Configure scripts de build/otimização no package.json."],
     "NodeModulesSize": 405.67,
     "OptimizationScripts": []
   },

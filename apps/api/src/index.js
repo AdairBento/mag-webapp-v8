@@ -1,4 +1,4 @@
-const createHealthHandler = require('./health-extended');
+const createHealthHandler = require("./health-extended");
 // src/index.js
 // MAG API — Express + Prisma (alias availability, paginação, CORS/Helmet, filtros e POSTs + cálculo de amount)
 
@@ -495,11 +495,9 @@ app.listen(PORT, () => {
   );
 });
 
-
-
 // teste husky
 // teste husky
 // teste husky
-// teste husky 
+// teste husky
 // test hook
 // test lint-staged

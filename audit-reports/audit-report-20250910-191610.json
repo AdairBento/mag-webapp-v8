@@ -32,13 +32,7 @@
   },
   "Dependencies": {
     "Unused": {
-      "Dependencies": [
-        "bcryptjs",
-        "ioredis",
-        "jsonwebtoken",
-        "kafkajs",
-        "uuid"
-      ],
+      "Dependencies": ["bcryptjs", "ioredis", "jsonwebtoken", "kafkajs", "uuid"],
       "DevDependencies": [
         "@types/bcryptjs",
         "@types/jsonwebtoken",
@@ -53,18 +47,9 @@
       "Packages": [
         {
           "Name": "@prisma/client",
-          "Current": [
-            "5.22.0",
-            "5.22.0"
-          ],
-          "Wanted": [
-            "5.22.0",
-            "5.22.0"
-          ],
-          "Latest": [
-            "6.16.0",
-            "6.16.0"
-          ]
+          "Current": ["5.22.0", "5.22.0"],
+          "Wanted": ["5.22.0", "5.22.0"],
+          "Latest": ["6.16.0", "6.16.0"]
         },
         {
           "Name": "@types/express",
@@ -116,18 +101,9 @@
         },
         {
           "Name": "prisma",
-          "Current": [
-            "5.22.0",
-            "5.22.0"
-          ],
-          "Wanted": [
-            "5.22.0",
-            "5.22.0"
-          ],
-          "Latest": [
-            "6.16.0",
-            "6.16.0"
-          ]
+          "Current": ["5.22.0", "5.22.0"],
+          "Wanted": ["5.22.0", "5.22.0"],
+          "Latest": ["6.16.0", "6.16.0"]
         },
         {
           "Name": "uuid",

@@ -27,6 +27,7 @@
   - `payment.failed.v1`
 
 ## Convenções
+
 - Cabeçalho de contexto: `x-tenant-id`, `x-user-id`, `x-trace-id`
 - Partição: por `tenantId`
 - Idempotência: `eventId` único

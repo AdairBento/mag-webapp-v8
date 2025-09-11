@@ -1,7 +1,5 @@
-node_modules/
-.dist/
-.env
-# Logs
+# Logs & PIDs
+logs/
 *.log
 *.pid
 *.err.log
@@ -14,3 +12,12 @@ node_modules/
 enable-internal-*.ps1
 wire-internal-*.ps1
 internal-wire.ps1
+
+# Node / build
+node_modules/
+dist/
+coverage/
+.eslintcache
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*

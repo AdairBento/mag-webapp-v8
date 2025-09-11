@@ -1,3 +1,16 @@
 node_modules/
 .dist/
 .env
+# Logs
+*.log
+*.pid
+*.err.log
+*.out.log
+
+# Backups
+*.backup-*
+
+# Scripts temporários PowerShell
+enable-internal-*.ps1
+wire-internal-*.ps1
+internal-wire.ps1

@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -39,15 +39,16 @@ export function createServer() {
   }
 
   // Internal
-  registerMetrics(app);
-  app.use("/internal/health", healthRouter());
-  app.use("/internal/metrics", metricsRouter());
+  registerMetrics();
+  app.use("/internal/health", healthRouter);
+  app.use("/internal/metrics", metricsRouter);
 
   // API v1 (contratos estáveis)
-  app.use("/api/v1", v1Router());
+  app.use("/api/v1", v1Router);
 
   // Error handler (sempre o último)
   app.use(errorHandler(logger));
 
   return app;
 }
+

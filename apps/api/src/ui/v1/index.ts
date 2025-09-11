@@ -1,4 +1,6 @@
-﻿const router = require("express").Router();
+// @ts-nocheck
+export {};
+const router = require("express").Router();
 const prisma = require("../../prisma");
 
 // Sub-rotas
@@ -30,3 +32,4 @@ router.get("/vehicles", async (req, res) => {
 });
 
 module.exports = router;
+

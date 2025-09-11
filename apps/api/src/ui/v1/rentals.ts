@@ -1,4 +1,6 @@
-﻿// src/api/v1/rentals.js
+// @ts-nocheck
+export {};
+// src/api/v1/rentals.js
 const router = require("express").Router();
 const prisma = require("../../prisma");
 
@@ -237,3 +239,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 module.exports = router;
+

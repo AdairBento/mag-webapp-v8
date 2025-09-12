@@ -1,4 +1,12 @@
-﻿const createHealthHandler = require("./health-extended");
+const createHealthHandler = require("./health-extended");
+function coerceIsoDate(input) {
+  if (!input) return null;
+  const raw = String(input).trim();
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? (raw + "T00:00:00.000Z") : raw;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.toISOString()); // normaliza para UTC
+}
 // src/index.js
 // MAG API â€” Express + Prisma (alias availability, paginaÃ§Ã£o, CORS/Helmet, filtros e POSTs + cÃ¡lculo de amount)
 
@@ -483,6 +491,83 @@ app.use(errorHandler);
 
 /* ===================== START ===================== */
 app.use('/api/v1', require('./routes/public-seed'));
+
+/**
+ * PATCH /api/v1/rentals/:id
+ * Atualiza status ou endDate de uma rental
+ */
+app.patch("/api/v1/rentals/:id", async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const tenantIdHeader = (req.headers["x-tenant-id"] || "").toString().trim();
+    if (!tenantIdHeader) {
+      return res.status(400).json({ error: "missing_tenant_header", header: "x-tenant-id" });
+    }
+
+    const current = await prisma.rental.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: "rental_not_found" });
+    if (String(current.tenantId) !== tenantIdHeader) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+
+    const payload = {};
+    let hasUpdate = false;
+
+    // Status permitido
+    if (typeof req.body?.status !== "undefined") {
+      const status = String(req.body.status);
+      const ALLOWED = new Set(["pending","confirmed","canceled","active","completed"]);
+      if (!ALLOWED.has(status)) {
+        return res.status(400).json({ error: "invalid_status", allowed: Array.from(ALLOWED) });
+      }
+      payload.status = status;
+      hasUpdate = true;
+    }
+
+    // Atualizar endDate
+    if (typeof req.body?.endDate !== "undefined") {
+      const newEnd = coerceIsoDate(req.body.endDate);
+      if (!(newEnd instanceof Date) || Number.isNaN(+newEnd)) {
+        return res.status(400).json({ error: "invalid_date" });
+      }
+      if (newEnd <= current.startDate) {
+        return res.status(400).json({ error: "endDate_must_be_after_startDate" });
+      }
+      payload.endDate = newEnd;
+      hasUpdate = true;
+    }
+
+    if (!hasUpdate) return res.status(400).json({ error: "no_fields_to_update" });
+
+    const updated = await prisma.rental.update({ where: { id }, data: payload });
+    res.json({ message: "rental_updated", data: updated });
+  } catch (e) {
+    console.error("PATCH /rentals/:id error", e);
+    if (e?.code === "P2025") {
+      return res.status(404).json({ error: "rental_not_found" });
+    }
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+app.get("/internal/routes", (req, res) => {
+  const stack = (app._router && app._router.stack) ? app._router.stack : [];
+  const routes = [];
+  for (const layer of stack) {
+    if (layer.route && layer.route.path) {
+      const methods = Object.keys(layer.route.methods).filter(k => layer.route.methods[k]);
+      routes.push({ path: layer.route.path, methods });
+    } else if (layer.name === "router" && layer.handle && layer.handle.stack) {
+      for (const r of layer.handle.stack) {
+        if (r.route && r.route.path) {
+          const methods = Object.keys(r.route.methods).filter(k => r.route.methods[k]);
+          routes.push({ path: r.route.path, methods, base: layer.regexp && layer.regexp.toString() });
+        }
+      }
+    }
+  }
+  res.json({ routes });
+});
+
 app.listen(PORT, () => {
   console.log(`API rodando em http://localhost:${PORT}`);
   console.log(`Health:    http://localhost:${PORT}/internal/health`);
@@ -507,4 +592,36 @@ app.listen(PORT, () => {
 
 
 
+// teste husky 2
+
+
+
+
+/** __PROBE__ — deve responder 200 se ESTE arquivo for o que está rodando */
+try {
+  if (typeof app?.get === "function") {
+    app.get("/__probe", (req, res) => res.json({ ok: true, file: __filename }));
+    console.log("[BOOT] __PROBE__ registrado em /__probe from", __filename);
+  }
+} catch (e) {
+  console.error("Falha ao registrar __PROBE__", e);
+}
+/** __PROBE__ — responde 200 para confirmar o arquivo em execução */
+try {
+  if (typeof app?.get === "function") {
+    app.get("/__probe", (req, res) => res.json({ ok: true, file: __filename }));
+    console.log("[BOOT] __PROBE__ registrado em /__probe from", __filename);
+  }
+} catch (e) {
+  console.error("Falha ao registrar __PROBE__", e);
+}
+/** __PROBE__ — responde 200 para confirmar o arquivo em execução */
+try {
+  if (typeof app?.get === "function") {
+    app.get("/__probe", (req, res) => res.json({ ok: true, file: __filename }));
+    console.log("[BOOT] __PROBE__ registrado em /__probe from", __filename);
+  }
+} catch (e) {
+  console.error("Falha ao registrar __PROBE__", e);
+}
 // teste husky 2

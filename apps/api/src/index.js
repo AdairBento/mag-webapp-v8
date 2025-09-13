@@ -34,6 +34,30 @@ mount("./routes/tenants.routes.js", "/api/v1/tenants");
 mount('./routes/clients.routes.js', '/api/v1/clients');
 mount('./routes/vehicles.routes.js', '/api/v1/vehicles');
 const PORT = process.env.PORT || 3000;
+const startTs = Date.now();
+app.get("/internal/health/extended", async (req, res) => {
+  try {
+    const { PrismaClient } = require("@prisma/client");
+    const prisma = global.__prisma || new PrismaClient();
+    if (!global.__prisma) global.__prisma = prisma;
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime_ms: Date.now() - startTs,
+      checks: { system: "ok", database: "ok" }
+    });
+  } catch (e) {
+    res.status(500).json({
+      status: "error",
+      message: e?.message || String(e),
+      checks: { system: "ok", database: "error" }
+    });
+  }
+});
 app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));
 
+// teste husky 2
+
+// teste husky 2
 // teste husky 2

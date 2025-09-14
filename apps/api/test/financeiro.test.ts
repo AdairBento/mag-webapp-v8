@@ -1,3 +1,5 @@
+import { it, expect } from 'vitest';
+import request from 'supertest';
 // @scaffold-managed
 import request from "supertest";
 import { createServer } from "../src/server";
@@ -7,3 +9,4 @@ it("POST /v1/financeiro/acao -> 200 { ok: true }", async () => {
   expect(res.status).toBe(200);
   expect(res.body.ok).toBe(true);
 });
+

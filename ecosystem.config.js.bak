@@ -1,0 +1,19 @@
+module.exports = {
+  apps: [{
+    name: "meu-app",
+    script: "./apps/api/src/server.ts",
+    exec_mode: "cluster",
+    instances: 2,
+    interpreter: "node",              // <- força Node (nada de bun)
+    node_args: "-r ts-node/register", // <- TS sem build
+    env: {
+      PORT: '3000',
+      HOST: '0.0.0.0',
+      NODE_ENV: "production",
+      LOG_LEVEL: "info",
+      LOGTAIL_TOKEN: process.env.LOGTAIL_TOKEN,
+      SENTRY_DSN: process.env.SENTRY_DSN
+    }
+  }]
+};
+

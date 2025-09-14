@@ -1,0 +1,83 @@
+{
+  "name": "mag-webapp-v8",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "nodemon apps/api/src/index.js",
+    "lint": "eslint .",
+    "format": "prettier . --write",
+    "test": "vitest --run --passWithNoTests",
+    "coverage": "nyc npm test",
+    "docs:openapi": "node scripts/generate-openapi.cjs",
+    "docs:jsdoc": "jsdoc -c jsdoc.json",
+    "audit:deps": "npm audit",
+    "audit:licenses": "npx license-checker --production --json",
+    "load": "artillery run load_test.yml",
+    "audit": "npm run lint && npm test",
+    "audit:node": "pwsh -File ./scripts/audit-node.ps1 -GenerateHTML",
+    "audit:api": "pwsh -File ./scripts/audit-node.ps1 -ProjectPath ./apps/api -GenerateHTML -OutputPath ./apps/api/audit-reports",
+    "lint:fix": "eslint . --fix",
+    "audit:full": "npm audit && npm outdated",
+    "audit:fix": "npm audit fix",
+    "clean": "npm prune && npm dedupe",
+    "deps:check": "npm outdated",
+    "deps:unused": "npx depcheck",
+    "lint:check": "eslint . --max-warnings 0",
+    "format:check": "prettier . --check",
+    "fix-all": "npm run lint:fix && npm run format",
+    "debug:api": "node --inspect apps/api/src/index.js",
+    "prepare": "husky",
+    "api:start": "powershell -NoProfile -ExecutionPolicy Bypass -File start-api.ps1 -Watch",
+    "api:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File stop-api.ps1 -All",
+    "typecheck": "tsc --noEmit --project apps/api/tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "artillery": "^2.0.24",
+    "depcheck": "^1.4.7",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-n": "^17.21.3",
+    "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.4.0",
+    "husky": "^9.1.7",
+    "jest": "^30.1.3",
+    "jsdoc": "^4.0.4",
+    "license-checker": "^25.0.1",
+    "lint-staged": "^15.5.2",
+    "nodemon": "^3.1.10",
+    "nyc": "^17.1.0",
+    "prettier": "^3.6.2",
+    "prisma": "^6.16.0",
+    "supertest": "^7.1.4",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "typescript-eslint": "^8.43.0",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0"
+  },
+  "depcheck": {
+    "ignoreMatches": [
+      "express",
+      "swagger-jsdoc",
+      "swagger-ui-express",
+      "depcheck"
+    ]
+  },
+  "prisma": {
+    "schema": ".\\apps\\api\\prisma\\schema.prisma"
+  }
+}
+

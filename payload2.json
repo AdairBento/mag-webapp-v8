@@ -1,0 +1,9 @@
+{
+  "status": "available",
+  "tenantId": "dev",
+  "model": "Smoke",
+  "year": 2024,
+  "dailyRate": 135.5,
+  "brand": "MAG",
+  "plate": "SMK6789"
+}

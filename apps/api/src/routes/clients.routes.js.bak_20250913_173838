@@ -1,0 +1,62 @@
+const express = require('express');
+const router = express.Router();
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+/**
+ * GET /api/v1/clients
+ * Lista clientes com filtros (tenantId, email, limit)
+ */
+router.get('/', async (req, res) => {
+  const { tenantId, email, limit = 100 } = req.query;
+  try {
+    const clients = await prisma.client.findMany({
+      where: {
+        tenantId: tenantId ? String(tenantId) : undefined,
+        email: email ? String(email) : undefined,
+      },
+      take: parseInt(limit),
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        document: true,
+        address: true,
+        tenantId: true,
+        tenant: true,
+        rentals: { select: { id: true } },
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return res.status(200).json({ data: clients });
+  } catch (err) {
+    return res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/clients
+ * Cria um novo cliente
+ */
+router.post('/', async (req, res) => {
+  const { tenantId, name, email, phone, document, address } = req.body;
+  try {
+    const client = await prisma.client.create({
+      data: {
+        tenantId,
+        name,
+        email,
+        phone: phone || null,
+        document: document || null,
+        address: address || null,
+      },
+    });
+    return res.status(201).json({ data: client });
+  } catch (err) {
+    return res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+module.exports = router;

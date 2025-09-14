@@ -1,0 +1,51 @@
+const express = require("express");
+const router  = express.Router();
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+// GET /api/v1/vehicles
+router.get("/", async (req, res) => {
+  try {
+    const { tenantId, plate, status, limit = 100 } = req.query;
+    const data = await prisma.vehicle.findMany({
+      where: {
+        tenantId: tenantId ? String(tenantId) : undefined,
+        plate:    plate ? String(plate).toUpperCase() : undefined,
+        status:   status || undefined
+      },
+      take: parseInt(limit, 10),
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error:"internal_error", message:e.message });
+  }
+});
+
+// POST /api/v1/vehicles
+router.post("/", async (req, res) => {
+  const id = req.body.tenantId || req.get("x-tenant-id") || req.query.tenantId;
+  if (!id) return res.status(400).json({ error:"bad_request", message:"tenantId required" });
+  if (!req.body.plate) return res.status(400).json({ error:"bad_request", message:"plate required" });
+  try {
+    const data = {
+      tenant:   { connect: { id: String(id) } },
+      plate:    String(req.body.plate).toUpperCase(),
+      brand:    req.body.brand ?? "Chevrolet",
+      model:    req.body.model ?? "Onix",
+      year:     parseInt(req.body.year ?? 2022, 10),
+      dailyRate:String(req.body.dailyRate ?? "120.00"),
+      status:   req.body.status ?? "available",
+      color:    req.body.color ?? "Prata",
+      fuelType: req.body.fuelType ?? "Flex",
+      category: req.body.category ?? "Hatch"
+    };
+    const created = await prisma.vehicle.create({ data });
+    res.status(201).json({ data: created });
+  } catch (e) {
+    const code = e.code === "P2002" ? 409 : 400;
+    res.status(code).json({ error: code===409?"conflict":"bad_request", message:e.message });
+  }
+});
+
+module.exports = router;

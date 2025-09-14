@@ -1,0 +1,18 @@
+import { Router } from "express";
+import rentalsRouter, { rentalsRouter as rentalsNamed } from "./v1/rentals";
+
+const internal = Router();
+
+// health
+internal.get("/health", (_req, res) => res.json({ ok: true }));
+
+// metrics (stub simples em texto)
+internal.get("/metrics", (_req, res) => {
+  res.type("text/plain").send("# TYPE up gauge\nup 1\n");
+});
+
+// exemplo de mount que não quebra
+internal.use("/v1/rentals", rentalsNamed || rentalsRouter);
+
+export { internal };
+export default internal;

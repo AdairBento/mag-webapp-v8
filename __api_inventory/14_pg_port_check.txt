@@ -1,0 +1,21 @@
+== Portas 5432 ativas ==
+
+OwningProcess LocalAddress LocalPort
+------------- ------------ ---------
+        12080 ::1               5432
+        30060 ::                5432
+
+
+== Processos na porta 5432 ==
+
+   Id ProcessName Path
+   -- ----------- ----
+12080 wslrelay    C:\Program Files\WSL\wslrelay.exe
+
+
+
+   Id ProcessName        Path
+   -- -----------        ----
+30060 com.docker.backend C:\Program Files\Docker\Docker\resources\com.docker.backend.exe
+
+

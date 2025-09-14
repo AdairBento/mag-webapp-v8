@@ -40,4 +40,9 @@ export default [
       "promise/no-nesting": "off",
     },
   },
-];
+,
+  {
+    languageOptions: { ecmaVersion: "latest", globals: { URL: "readonly", fetch: "readonly" } },
+    env: { node: true }
+  }
+].filter(Boolean);

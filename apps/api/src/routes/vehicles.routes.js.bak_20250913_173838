@@ -1,0 +1,65 @@
+const { Router } = require("express");
+const { normalizeAmount } = require("../utils-amount");
+
+function requireNonEmpty(v, field) {
+  if (v == null || String(v).trim() === "") {
+    const e = new Error(`${field} é obrigatório`);
+    e.status = 400; e.payload = { field }; throw e;
+  }
+  return v;
+}
+function getPaging(req) {
+  const page  = Math.max(1, parseInt(req.query.page  || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || "20", 10)));
+  const skip  = (page - 1) * limit;
+  return { page, limit, skip };
+}
+
+module.exports = ({ prisma }) => {
+  const r = Router();
+
+  // GET /vehicles
+  r.get("/vehicles", async (req, res, next) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+
+      const { page, limit, skip } = getPaging(req);
+      const [items, total] = await Promise.all([
+        prisma.vehicle.findMany({ where: { tenantId }, skip, take: limit }),
+        prisma.vehicle.count({ where: { tenantId } }),
+      ]);
+
+      res.json({ data: items, pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) }});
+    } catch (e) { next(e); }
+  });
+
+  // POST /vehicles
+  r.post("/vehicles", async (req, res, next) => {
+    try {
+      const { tenantId, plate, brand, model, year, dailyRate, status, color, fuelType, category } = req.body || {};
+      requireNonEmpty(tenantId, "tenantId");
+      requireNonEmpty(plate, "plate");
+      requireNonEmpty(brand, "brand");
+      requireNonEmpty(model, "model");
+      requireNonEmpty(year, "year");
+
+      const vehicle = await prisma.vehicle.create({
+        data: {
+          tenant:   { connect: { id: tenantId } },
+          plate, brand, model,
+          year:     Number(year),
+          color:    ((color     ?? "Prata") + "").trim() || "Prata",
+          fuelType: ((fuelType  ?? "Flex")  + "").trim() || "Flex",
+          category: ((category  ?? "Hatch") + "").trim() || "Hatch",
+          dailyRate: (dailyRate != null ? normalizeAmount(dailyRate) : null),
+          status:   status || "available",
+        },
+      });
+
+      res.status(201).json({ data: vehicle });
+    } catch (e) { next(e); }
+  });
+
+  return r;
+};

@@ -1,4 +1,8 @@
 {
-  "{apps,packages}/**/*.{js,mjs,cjs,ts,tsx}": ["eslint --fix --no-warn-ignored --max-warnings 0"],
-  "{apps,packages}/**/*.{json,md,yml,yaml,html,css,scss,less,hbs}": ["prettier --write"]
+  "{apps,packages}/**/*.{ts,tsx}": [
+    "eslint --fix --no-warn-ignored --max-warnings 0"
+  ],
+  "{apps,packages}/**/*.{json,md,yml,yaml,html,css,scss,less,hbs}": [
+    "prettier --write"
+  ]
 }

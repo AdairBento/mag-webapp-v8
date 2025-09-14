@@ -1,0 +1,65 @@
+const express = require("express");
+const { PrismaClient } = require("@prisma/client");
+const { requireNonEmpty } = require("../utils");
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+// GET /api/v1/maintenances?tenantId=&vehicleId=&status=&limit=
+router.get("/", async (req, res) => {
+  const { tenantId, vehicleId, status, limit = 20 } = req.query;
+  if (!tenantId) {
+    return res.status(400).json({
+      error: "bad_request",
+      message: "tenantId é obrigatório"
+    });
+  }
+
+  const where = { tenantId };
+  if (vehicleId) where.vehicleId = vehicleId;
+  if (status)    where.status    = status;
+
+  try {
+    const maintenances = await prisma.maintenance.findMany({
+      where,
+      take: parseInt(limit, 10),
+      orderBy: { createdAt: "desc" }
+    });
+    return res.status(200).json({ data: maintenances });
+  } catch (err) {
+    return res.status(500).json({
+      error: "internal_error",
+      message: err.message
+    });
+  }
+});
+
+// POST /api/v1/maintenances
+router.post("/", async (req, res) => {
+  const { tenantId, vehicleId, description, startDate, endDate, status="scheduled" } = req.body;
+  try {
+    requireNonEmpty(tenantId,    "tenantId");
+    requireNonEmpty(vehicleId,   "vehicleId");
+    requireNonEmpty(description, "description");
+
+    const data = {
+      tenant:      { connect: { id: tenantId } },
+      vehicle:     { connect: { id: vehicleId } },
+      description,
+      startDate:   startDate ? new Date(startDate) : new Date(),
+      endDate:     endDate   ? new Date(endDate)   : null,
+      status
+    };
+
+    const maintenance = await prisma.maintenance.create({ data });
+    return res.status(201).json({ data: maintenance });
+  } catch (err) {
+    const code = err.name === "ValidationError" ? 400 : 500;
+    return res.status(code).json({
+      error: code === 400 ? "bad_request" : "internal_error",
+      message: err.message
+    });
+  }
+});
+
+module.exports = router;

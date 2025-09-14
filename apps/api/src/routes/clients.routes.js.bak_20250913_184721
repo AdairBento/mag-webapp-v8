@@ -1,0 +1,48 @@
+const express = require("express");
+const router  = express.Router();
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+// GET /api/v1/clients
+router.get("/", async (req, res) => {
+  try {
+    const { tenantId, email, limit = 100 } = req.query;
+    const data = await prisma.client.findMany({
+      where: {
+        tenantId: tenantId ? String(tenantId) : undefined,
+        email:    email ? String(email) : undefined,
+      },
+      take: parseInt(limit, 10),
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error:"internal_error", message:e.message });
+  }
+});
+
+// POST /api/v1/clients
+router.post("/", async (req, res) => {
+  const { tenantId: tId, name, email, phone, document, address } = req.body;
+  const id = tId || req.get("x-tenant-id") || req.query.tenantId;
+  if (!id)    return res.status(400).json({ error:"bad_request", message:"tenantId required" });
+  if (!name)  return res.status(400).json({ error:"bad_request", message:"name required" });
+  if (!email) return res.status(400).json({ error:"bad_request", message:"email required" });
+  try {
+    const data = {
+      tenant:   { connect: { id: String(id) } },
+      name:     String(name),
+      email:    String(email).toLowerCase(),
+      phone:    phone ?? null,
+      document: document ?? null,
+      address:  address ?? null
+    };
+    const client = await prisma.client.create({ data });
+    res.status(201).json({ data: client });
+  } catch (e) {
+    const code = e.code === "P2002" ? 409 : 500;
+    res.status(code).json({ error: code===409?"conflict":"internal_error", message:e.message });
+  }
+});
+
+module.exports = router;

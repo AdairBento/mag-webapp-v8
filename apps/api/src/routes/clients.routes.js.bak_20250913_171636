@@ -1,0 +1,92 @@
+// apps/api/src/routes/clients.routes.js
+const { Router } = require("express");
+
+// helpers
+function requireNonEmpty(v, field) {
+  if (v == null || String(v).trim() === "") {
+    const e = new Error(`${field} é obrigatório`);
+    e.status = 400;
+    e.payload = { field };
+    throw e;
+  }
+  return v;
+}
+function getPaging(req) {
+  const page  = Math.max(1, parseInt(req.query.page  || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || "20", 10)));
+  const skip  = (page - 1) * limit;
+  return { page, limit, skip };
+}
+
+module.exports = ({ prisma }) => {
+  const r = Router();
+
+  // GET /clients
+  r.get("/clients", async (req, res, next) => {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) {
+        return res.status(400).json({ error: "bad_request", message: "tenantId é obrigatório" });
+      }
+
+      const { page, limit, skip } = getPaging(req);
+      const where = { tenantId };
+
+      const [items, total] = await Promise.all([
+        prisma.client.findMany({
+          where,
+          skip,
+          take: limit,
+          // se seu modelo não tiver createdAt, troque para: orderBy: { name: "asc" }
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.client.count({ where }),
+      ]);
+
+      res.json({
+        data: items,
+        pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+      });
+    } catch (e) { next(e); }
+  });
+
+  // POST /clients
+  r.post("/clients", async (req, res, next) => {
+    try {
+      const { tenantId, name, email, phone, document, address } = req.body || {};
+      requireNonEmpty(tenantId, "tenantId");
+      requireNonEmpty(name, "name");
+
+      const name_     = String(name).trim();
+      const email_    = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
+      const phone_    = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+      const document_ = ((document ?? "") + "").trim(); // nunca null
+      const address_  = ((address ?? "") + "").trim(); // nunca null
+
+      const client = await prisma.client.create({
+        data: {
+          tenant: { connect: { id: tenantId } },
+          name: name_,
+          email: email_,
+          phone: phone_,
+      document: document_,
+          address: address_,
+        },
+      });
+
+      res.status(201).json({ data: client });
+    } catch (e) {
+      // Conflitos de unicidade (ex.: email/document únicos por tenant)
+      if (e?.code === "P2002") {
+        return res.status(409).json({ error: "conflict", message: "Registro já existe (constraint única)", meta: { target: e.meta?.target } });
+      }
+      next(e);
+    }
+  });
+
+  return r;
+};
+
+
+
+

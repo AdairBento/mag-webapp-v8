@@ -1,0 +1,13 @@
+== 5432 ==
+
+   Id ProcessName Path
+   -- ----------- ----
+12080 wslrelay    C:\Program Files\WSL\wslrelay.exe
+
+
+
+   Id ProcessName        Path
+   -- -----------        ----
+30060 com.docker.backend C:\Program Files\Docker\Docker\resources\com.docker.backend.exe
+
+

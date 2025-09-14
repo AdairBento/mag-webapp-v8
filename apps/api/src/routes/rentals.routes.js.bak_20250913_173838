@@ -1,0 +1,166 @@
+const express = require('express');
+const router = express.Router();
+// apps/api/src/routes/rentals.routes.js
+const { Router } = require("express");
+const { RENTAL_STATUSES, isValidStatus, isBlockingStatus } = require("../utils-status");
+const { normalizeAmount } = require("../utils-amount");
+
+// helpers
+function requireNonEmpty(v, field){ if(v==null || String(v).trim()===""){ const e=new Error(`${field} é obrigatório`); e.status=400; e.payload={field}; throw e;} return v;}
+function isIsoDate(s){ return typeof s==="string" && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(s); }
+function requireIsoDate(s, f){ if(!isIsoDate(s)){ const e=new Error(`${f} inválido (use YYYY-MM-DD)`); e.status=400; e.payload={[f]:s}; throw e;} return s; }
+function toDate(s){ const d=new Date(s); if(isNaN(d.getTime())){ const e=new Error("data inválida"); e.status=400; e.payload={value:s}; throw e;} return d; }
+function diffDaysUTC(a,b){ const MS=86400000; const A=Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),a.getUTCDate()); const B=Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate()); return Math.round((B-A)/MS);}
+function coerceIsoDate(x){ if(!x) return null; const raw=String(x).trim(); const iso=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+"T00:00:00.000Z":raw; const d=new Date(iso); if(isNaN(d.getTime())) return null; return new Date(d.toISOString()); }
+function getPaging(req){ const page=Math.max(1,parseInt(req.query.page||"1",10)); const limit=Math.min(100,Math.max(1,parseInt(req.query.limit||"20",10))); const skip=(page-1)*limit; return{page,limit,skip}; }
+
+module.exports = ({ prisma }) => {
+  const r = Router();
+
+  // LISTAR
+  r.get("/rentals", async (req,res,next)=>{ try{
+    const { tenantId, status, startFrom, endTo } = req.query;
+    if(!tenantId) return res.status(400).json({ error:"bad_request", message:"tenantId é obrigatório" });
+
+    if(status && !isValidStatus(status)){
+      return res.status(400).json({ error:"bad_request", message:"status inválido", details:{ allowed:Object.values(RENTAL_STATUSES)}});
+    }
+    if((startFrom&&!isIsoDate(startFrom))||(endTo&&!isIsoDate(endTo))){
+      return res.status(400).json({ error:"bad_request", message:"datas inválidas (use YYYY-MM-DD)", details:{startFrom,endTo}});
+    }
+
+    const where={ tenantId };
+    if(status) where.status=status;
+    if(startFrom) where.startDate=Object.assign(where.startDate??{}, { gte:new Date(startFrom) });
+    if(endTo)   where.endDate  =Object.assign(where.endDate  ??{}, { lte:new Date(endTo)   });
+
+    const { page, limit, skip } = getPaging(req);
+    const [items,total] = await Promise.all([
+      prisma.rental.findMany({
+        where,
+        include:{ client:true, vehicle:true, tenant:{select:{id:true,name:true,domain:true}} },
+        skip, take:limit, orderBy:{ createdAt:"desc" }
+      }),
+      prisma.rental.count({ where })
+    ]);
+    res.json({ data:items, pagination:{ page, limit, total, pages:Math.max(1,Math.ceil(total/limit)) }, filters:{ status:status||null, startFrom:startFrom||null, endTo:endTo||null }});
+  }catch(e){ next(e); }});
+
+  // POR ID
+  r.get("/rentals/:id", async (req,res,next)=>{ try{
+    const rental = await prisma.rental.findUnique({ where:{ id:req.params.id }});
+    if(!rental) return res.status(404).json({ error:"not_found", message:"not_found" });
+    res.json({ data:rental });
+  }catch(e){ next(e); }});
+
+  // CRIAR
+  r.post("/rentals", async (req,res,next)=>{ try{
+    const { tenantId, clientId, vehicleId, startDate, endDate, status, amount } = req.body||{};
+    requireNonEmpty(tenantId,"tenantId"); requireNonEmpty(clientId,"clientId"); requireNonEmpty(vehicleId,"vehicleId");
+    requireIsoDate(startDate,"startDate"); requireIsoDate(endDate,"endDate");
+
+    const start=toDate(startDate), end=toDate(endDate);
+    if(end<=start) return res.status(400).json({ error:"bad_request", message:"endDate deve ser maior que startDate", details:{ startDate,endDate } });
+
+    const rentalStatus = status || RENTAL_STATUSES.CONFIRMED;
+    if(!isValidStatus(rentalStatus)) return res.status(400).json({ error:"bad_request", message:"status inválido", details:{ allowed:Object.values(RENTAL_STATUSES)} });
+
+    const [tenant,client,vehicle] = await Promise.all([
+      prisma.tenant.findUnique({ where:{ id:tenantId }}),
+      prisma.client.findUnique({ where:{ id:clientId }}),
+      prisma.vehicle.findUnique({ where:{ id:vehicleId }}),
+    ]);
+    if(!tenant) return res.status(404).json({ error:"not_found", message:"tenant não encontrado", details:{ tenantId }});
+    if(!client) return res.status(404).json({ error:"not_found", message:"client não encontrado", details:{ clientId }});
+    if(!vehicle) return res.status(404).json({ error:"not_found", message:"vehicle não encontrado", details:{ vehicleId }});
+
+    if(isBlockingStatus(rentalStatus)){
+      const conflicting = await prisma.rental.findFirst({
+        where:{ tenantId, vehicleId, status:RENTAL_STATUSES.CONFIRMED, NOT:[{ endDate:{ lte:start }},{ startDate:{ gte:end }}] }
+      });
+      if(conflicting) return res.status(409).json({ error:"conflict", message:"Conflito de agenda para este veículo",
+        details:{ vehicleId, requested:{ startDate,endDate }, conflictWith:{ id:conflicting.id, startDate:conflicting.startDate, endDate:conflicting.endDate, status:conflicting.status } }});
+    }
+
+    let finalAmount = amount;
+    if(finalAmount==null || String(finalAmount).trim()===""){
+      const days=Math.max(1,diffDaysUTC(start,end));
+      const rate=vehicle.dailyRate?parseFloat(vehicle.dailyRate):0;
+      finalAmount=normalizeAmount(days*rate);
+    } else {
+      finalAmount=normalizeAmount(finalAmount);
+    }
+
+    const rental = await prisma.rental.create({
+      data:{ tenantId, clientId, vehicleId, startDate:start, endDate:end, status:rentalStatus, amount:finalAmount }
+    });
+    res.status(201).json({ data:rental });
+  }catch(e){ next(e); }});
+
+  // PATCH /rentals/:id
+  r.patch("/rentals/:id", async (req,res,next)=>{ try{
+    const id=String(req.params.id);
+    const tenantIdHeader=(req.headers["x-tenant-id"]||"").toString().trim();
+    if(!tenantIdHeader) return res.status(400).json({ error:"missing_tenant_header", header:"x-tenant-id" });
+
+    const current = await prisma.rental.findUnique({ where:{ id } });
+    if(!current) return res.status(404).json({ error:"rental_not_found" });
+    if(String(current.tenantId)!==tenantIdHeader) return res.status(403).json({ error:"forbidden" });
+
+    const payload={}; let touched=false;
+
+    if(typeof req.body?.status!=="undefined"){
+      const s=String(req.body.status);
+      if(!isValidStatus(s)) return res.status(400).json({ error:"invalid_status", allowed:Object.values(RENTAL_STATUSES) });
+      payload.status=s; touched=true;
+    }
+
+    if(typeof req.body?.endDate!=="undefined"){
+      const nd=coerceIsoDate(req.body.endDate);
+      if(!(nd instanceof Date) || Number.isNaN(+nd)) return res.status(400).json({ error:"invalid_date" });
+      if(nd<=current.startDate) return res.status(400).json({ error:"endDate_must_be_after_startDate" });
+      payload.endDate=nd; touched=true;
+    }
+
+    if(!touched) return res.status(400).json({ error:"no_fields_to_update" });
+
+    const updated = await prisma.rental.update({ where:{ id }, data:payload });
+    res.json({ message:"rental_updated", data:updated });
+  }catch(e){ if(e?.code==="P2025") return res.status(404).json({ error:"rental_not_found" }); next(e); }});
+
+  return r;
+};
+
+/**
+ * PATCH /api/v1/rentals/:id
+ * Atualiza campos: status, endDate, dailyRate
+ */
+router.patch('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status, endDate, dailyRate } = req.body;
+
+  const data = {};
+  if (typeof status   !== "undefined") data.status = status;
+  if (typeof endDate  !== "undefined" && endDate)  data.endDate = new Date(endDate);
+  if (typeof dailyRate!== "undefined") {
+    const n = Number(dailyRate);
+    if (!Number.isNaN(n)) data.dailyRate = n;
+  }
+
+  try {
+    const rental = await prisma.rental.update({
+      where: { id },
+      data
+    });
+    return res.status(200).json({ data: rental });
+  } catch (err) {
+    return res.status(500).json({
+      error: "internal_error",
+      message: err.message
+    });
+  }
+});
+module.exports = router;
+
+
+

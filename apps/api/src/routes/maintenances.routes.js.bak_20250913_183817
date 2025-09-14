@@ -1,0 +1,64 @@
+const express = require("express");
+const { PrismaClient } = require("@prisma/client");
+const { requireNonEmpty } = require("../utils");
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+// GET /api/v1/maintenances?tenantId=&vehicleId=&status=&limit=
+router.get("/", async (req, res) => {
+  const { tenantId, vehicleId, status, limit = 20 } = req.query;
+  if (!tenantId) {
+    return res.status(400).json({
+      error: "bad_request",
+      message: "tenantId é obrigatório"
+    });
+  }
+
+  const where = { tenantId };
+  if (vehicleId) where.vehicleId = vehicleId;
+  if (status)    where.status    = status;
+
+  try {
+    const maintenances = await prisma.maintenance.findMany({
+      where,
+      take: parseInt(limit, 10),
+      orderBy: { createdAt: "desc" }
+    });
+    return res.status(200).json({ data: maintenances });
+  } catch (err) {
+    return res.status(500).json({
+      error: "internal_error",
+      message: err.message
+    });
+  }
+});
+
+// POST /api/v1/maintenances
+router.post('/', async (req, res) => {
+  try {
+    const tenantId = req.body.tenantId || req.get('x-tenant-id') || req.query.tenantId;
+    const { vehicleId, description, startDate, endDate, status } = req.body;
+    if (!tenantId)    return res.status(400).json({ error:'bad_request', message:'tenantId required' });
+    if (!vehicleId)   return res.status(400).json({ error:'bad_request', message:'vehicleId required' });
+    if (!description) return res.status(400).json({ error:'bad_request', message:'description required' });
+    if (!startDate)   return res.status(400).json({ error:'bad_request', message:'startDate required' });
+
+    const data = {
+      tenant:      { connect: { id: String(tenantId) } },
+      vehicle:     { connect: { id: String(vehicleId) } },
+      description: String(description),
+      startDate:   new Date(startDate),
+      endDate:     endDate ? new Date(endDate) : null,
+      status:      status ?? 'scheduled'
+    };
+
+    const created = await prisma.maintenance.create({ data });
+    res.status(201).json({ data: created });
+  } catch (e) {
+    res.status(400).json({ error: 'bad_request', message: e.message });
+  }
+});
+
+module.exports = router;
+

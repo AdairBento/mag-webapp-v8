@@ -1,0 +1,21 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "type": "stat", "title": "Processos PM2",
+      "targets": [{"expr": "count(pm2_process_cpu_percent)"}], "gridPos": {"x":0,"y":0,"w":8,"h":6}
+    },
+    {
+      "type": "timeseries", "title": "CPU % por processo",
+      "targets": [{"expr": "pm2_process_cpu_percent"}], "gridPos": {"x":8,"y":0,"w":16,"h":8}
+    },
+    {
+      "type": "timeseries", "title": "Memória (MB)",
+      "targets": [{"expr": "pm2_process_memory_bytes/1024/1024"}], "gridPos": {"x":0,"y":8,"w":24,"h":8}
+    }
+  ],
+  "schemaVersion": 38,
+  "title": "PM2 - Overview",
+  "version": 1
+}

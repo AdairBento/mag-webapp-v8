@@ -1,88 +1,89 @@
-generator client {
-  provider = "prisma-client-js"
-}
+// apps/api/prisma/schema.prisma
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 model Tenant {
   id        String   @id @default(uuid())
   name      String
-  domain    String   @unique
-  settings  String?
+  domain    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  clients   Client[]
-  vehicles  Vehicle[]
-  rentals   Rental[]
-  users     User[]
-  @@map("tenants")
-}
 
-model User {
-  id       String   @id @default(uuid())
-  email    String   
-  name     String
-  roles    String
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([email, tenantId])
-  @@map("users")
+  vehicles  Vehicle[]
+  clients   Client[]
+  rentals   Rental[]
 }
 
 model Client {
-  id       String @id @default(uuid())
-  name     String
-  email    String
-  phone    String
-  document String
-  address  String
-  tenantId String
-  tenant  Tenant   @relation(fields: [tenantId], references: [id])
-  rentals Rental[]
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name      String
+  email     String?
+  phone     String?
+  document  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@unique([email, tenantId])
-  @@map("clients")
+
+  rentals   Rental[]
+
+  @@index([tenantId])
 }
 
 model Vehicle {
-  id        String @id @default(uuid())
-  model     String
-  brand     String
-  year      Int
-  plate     String
-  color     String
-  fuelType  String
-  category  String
-  dailyRate String
-  status    String @default("available")
+  id        String   @id @default(uuid())
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  rentals   Rental[]
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  plate     String
+  brand     String
+  model     String
+  year      Int
+  color     String   @default("Prata")
+  fuelType  String   @default("Flex")
+  category  String   @default("Hatch")
+
+  // Decimal SEM @db.* no SQLite + default
+  dailyRate Decimal  @default(120.00)
+
+  status    String   @default("available")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@unique([plate, tenantId])
-  @@map("vehicles")
+
+  rentals   Rental[]
+
+  @@index([tenantId])
+  @@unique([tenantId, plate])
 }
 
 model Rental {
   id        String   @id @default(uuid())
+  tenantId  String
   clientId  String
   vehicleId String
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
   startDate DateTime
   endDate   DateTime
   status    String   @default("pending")
+  // guardamos como texto monetário "135.50" para simplicidade
   amount    String
-  tenantId  String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  client    Client  @relation(fields: [clientId], references: [id])
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@map("rentals")
+
+  @@index([tenantId])
+  @@index([vehicleId])
 }

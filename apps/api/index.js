@@ -1,5 +1,4 @@
-// src/index.js (CommonJS + Prisma + SQLite)
-
+// src/index.js (CommonJS + Prisma + SQLite/Postgres)
 require("dotenv/config");
 const express = require("express");
 const cors = require("cors");
@@ -33,6 +32,23 @@ function coerceIsoDate(val) {
   const d = new Date(val);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+async function findConflict({ vehicleId, start, end, excludeId = null }) {
+  // Conflito clássico: começa antes do fim E termina depois do início
+  // Regra: só 'confirmed' bloqueia agenda
+  return prisma.rental.findFirst({
+    where: {
+      vehicleId: String(vehicleId),
+      startDate: { lt: end },
+      endDate: { gt: start },
+      status: { in: ["confirmed"] },
+      ...(excludeId ? { NOT: { id: String(excludeId) } } : {}),
+    },
+    select: { id: true },
+  });
+}
+function getTenantFromReq(req) {
+  return (req.headers["x-tenant-id"] || req.query.tenantId || "").toString().trim();
+}
 
 /* -------------------------------------------------------------------------- */
 /* Apoio: listar Clients / Vehicles (descobrir IDs)                           */
@@ -40,7 +56,9 @@ function coerceIsoDate(val) {
 app.get("/api/v1/clients", async (req, res) => {
   try {
     const where = {};
-    if (req.query.tenantId) where.tenantId = String(req.query.tenantId);
+    const tenantId = getTenantFromReq(req);
+    if (tenantId) where.tenantId = tenantId;
+
     const data = await prisma.client.findMany({ where, orderBy: { name: "asc" } });
     res.json({ data });
   } catch (e) {
@@ -52,7 +70,9 @@ app.get("/api/v1/clients", async (req, res) => {
 app.get("/api/v1/vehicles", async (req, res) => {
   try {
     const where = {};
-    if (req.query.tenantId) where.tenantId = String(req.query.tenantId);
+    const tenantId = getTenantFromReq(req);
+    if (tenantId) where.tenantId = tenantId;
+
     const data = await prisma.vehicle.findMany({ where, orderBy: { model: "asc" } });
     res.json({ data });
   } catch (e) {
@@ -65,8 +85,8 @@ app.get("/api/v1/vehicles", async (req, res) => {
 /* Rentals                                                                    */
 /* -------------------------------------------------------------------------- */
 /**
- * GET /api/v1/rentals?page=1&limit=20&tenantId=...
- * Lista rentals com paginação; inclui client, vehicle e um resumo do tenant.
+ * GET /api/v1/rentals?page=1&limit=20&tenantId=...&status=confirmed&startFrom=YYYY-MM-DD&endTo=YYYY-MM-DD
+ * Lista rentals com filtros e paginação; inclui client, vehicle e um resumo do tenant.
  */
 app.get("/api/v1/rentals", async (req, res) => {
   try {
@@ -75,7 +95,20 @@ app.get("/api/v1/rentals", async (req, res) => {
     const skip = (page - 1) * limit;
 
     const where = {};
-    if (req.query.tenantId) where.tenantId = String(req.query.tenantId);
+    const tenantId = getTenantFromReq(req);
+    if (tenantId) where.tenantId = tenantId;
+
+    if (req.query.status) where.status = String(req.query.status);
+
+    // filtros de período (opcionais)
+    const startFrom = req.query.startFrom ? new Date(req.query.startFrom) : null; // >= startDate
+    const endTo = req.query.endTo ? new Date(req.query.endTo) : null; // <= endDate
+    if (!Number.isNaN(startFrom?.getTime()) || !Number.isNaN(endTo?.getTime())) {
+      where.AND = [];
+      if (startFrom && !Number.isNaN(startFrom.getTime()))
+        where.AND.push({ startDate: { gte: startFrom } });
+      if (endTo && !Number.isNaN(endTo.getTime())) where.AND.push({ endDate: { lte: endTo } });
+    }
 
     const [total, data] = await Promise.all([
       prisma.rental.count({ where }),
@@ -95,6 +128,11 @@ app.get("/api/v1/rentals", async (req, res) => {
     res.json({
       data,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
+      filters: {
+        status: req.query.status ?? null,
+        startFrom: req.query.startFrom ?? null,
+        endTo: req.query.endTo ?? null,
+      },
     });
   } catch (err) {
     console.error("GET /rentals error", err);
@@ -129,19 +167,20 @@ app.get("/api/v1/rentals/:id", async (req, res) => {
  * POST /api/v1/rentals
  * Body mínimo:
  * {
- *   "tenantId": "uuid-tenant",
+ *   "tenantId": "uuid-tenant",  // será sobrescrito pelo header x-tenant-id se vier
  *   "clientId": "uuid-client",
  *   "vehicleId": "uuid-vehicle",
  *   "startDate": "2025-09-08T12:00:00.000Z",
  *   "endDate":   "2025-09-10T12:00:00.000Z",
  *   "amount": "350.00",
- *   "status": "pending" | "confirmed" | "completed" | "canceled"  (opcional)
+ *   "status": "pending" | "confirmed" | "completed" | "canceled"  (opcional, default: pending)
  * }
  */
 app.post("/api/v1/rentals", async (req, res) => {
   try {
+    const headerTenant = getTenantFromReq(req);
     const {
-      tenantId,
+      tenantId: bodyTenantId,
       clientId,
       vehicleId,
       startDate,
@@ -149,6 +188,8 @@ app.post("/api/v1/rentals", async (req, res) => {
       amount,
       status = "pending",
     } = req.body || {};
+
+    const tenantId = (headerTenant || bodyTenantId || "").toString().trim();
 
     // Validação básica
     const missing = [];
@@ -183,6 +224,14 @@ app.post("/api/v1/rentals", async (req, res) => {
     if (!client) return res.status(400).json({ error: "client_not_found" });
     if (!vehicle) return res.status(400).json({ error: "vehicle_not_found" });
 
+    // Conflito: somente bloqueia se for criar como 'confirmed'
+    if (String(status) === "confirmed") {
+      const conflict = await findConflict({ vehicleId, start: sDate, end: eDate });
+      if (conflict) {
+        return res.status(409).json({ error: "vehicle_unavailable", conflictId: conflict.id });
+      }
+    }
+
     const created = await prisma.rental.create({
       data: {
         tenantId: String(tenantId),
@@ -205,26 +254,38 @@ app.post("/api/v1/rentals", async (req, res) => {
 /**
  * PATCH /api/v1/rentals/:id
  * Campos aceitos: { status?, endDate? }
- * - status ∈ ["pending","confirmed","completed","canceled"] (não validamos, só normalizamos)
  * - endDate deve ser data válida e > startDate atual
+ * - se status final ficar "confirmed", valida conflito
+ * - requer header x-tenant-id correspondente ao registro
  */
 app.patch("/api/v1/rentals/:id", async (req, res) => {
   try {
     const id = String(req.params.id);
+    const tenantIdHeader = (req.headers["x-tenant-id"] || "").toString().trim();
+    if (!tenantIdHeader) {
+      return res.status(400).json({ error: "missing_tenant_header", header: "x-tenant-id" });
+    }
+
+    // carrega o atual uma vez só
+    const current = await prisma.rental.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: "rental_not_found" });
+    if (String(current.tenantId) !== tenantIdHeader) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+
     const payload = {};
     let hasUpdate = false;
 
+    // status
     if (typeof req.body?.status !== "undefined") {
       payload.status = String(req.body.status);
       hasUpdate = true;
     }
+
+    // endDate
     if (typeof req.body?.endDate !== "undefined") {
       const newEnd = coerceIsoDate(req.body.endDate);
       if (!newEnd) return res.status(400).json({ error: "invalid_date" });
-
-      // busca o rental pra checar startDate
-      const current = await prisma.rental.findUnique({ where: { id } });
-      if (!current) return res.status(404).json({ error: "rental_not_found" });
       if (newEnd <= current.startDate) {
         return res.status(400).json({ error: "endDate_must_be_after_startDate" });
       }
@@ -232,21 +293,61 @@ app.patch("/api/v1/rentals/:id", async (req, res) => {
       hasUpdate = true;
     }
 
-    if (!hasUpdate) {
-      return res.status(400).json({ error: "no_fields_to_update" });
+    if (!hasUpdate) return res.status(400).json({ error: "no_fields_to_update" });
+
+    // Estado final simulado
+    const finalStatus =
+      typeof payload.status !== "undefined" ? payload.status : current.status;
+    const finalEnd =
+      typeof payload.endDate !== "undefined" ? payload.endDate : current.endDate;
+
+    // Se ficar confirmed, validar conflito
+    if (finalStatus === "confirmed") {
+      const conflict = await findConflict({
+        vehicleId: current.vehicleId,
+        start: current.startDate,
+        end: finalEnd,
+        excludeId: id,
+      });
+      if (conflict) {
+        return res.status(409).json({ error: "vehicle_unavailable", conflictId: conflict.id });
+      }
     }
 
-    const updated = await prisma.rental.update({
-      where: { id },
-      data: payload,
-    });
-
+    const updated = await prisma.rental.update({ where: { id }, data: payload });
     res.json({ message: "rental_updated", data: updated });
   } catch (e) {
     console.error("PATCH /rentals/:id error", e);
     if (e?.code === "P2025") {
       return res.status(404).json({ error: "rental_not_found" });
     }
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
+/**
+ * DELETE /api/v1/rentals/:id
+ * Requer header x-tenant-id que corresponda ao registro.
+ */
+app.delete("/api/v1/rentals/:id", async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const tenantIdHeader = (req.headers["x-tenant-id"] || "").toString().trim();
+    if (!tenantIdHeader) {
+      return res.status(400).json({ error: "missing_tenant_header", header: "x-tenant-id" });
+    }
+
+    const current = await prisma.rental.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: "rental_not_found" });
+    if (String(current.tenantId) !== tenantIdHeader) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+
+    await prisma.rental.delete({ where: { id } });
+    res.json({ message: "rental_deleted", id });
+  } catch (e) {
+    if (e?.code === "P2025") return res.status(404).json({ error: "rental_not_found" });
+    console.error("DELETE /rentals/:id error", e);
     res.status(500).json({ error: "internal_error" });
   }
 });

@@ -1,0 +1,6 @@
+ERR /api/clients -> Response status code does not indicate success: 404 (Not Found).
+ERR /clients -> Response status code does not indicate success: 404 (Not Found).
+ERR /api/vehicles -> Response status code does not indicate success: 404 (Not Found).
+ERR /vehicles -> Response status code does not indicate success: 404 (Not Found).
+ERR /api/rentals -> Response status code does not indicate success: 404 (Not Found).
+ERR /rentals -> Response status code does not indicate success: 404 (Not Found).

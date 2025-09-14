@@ -1,0 +1,7 @@
+services:
+  postgres:
+    ports:
+      - target: 5432
+        published: 5433
+        protocol: tcp
+        mode: ingress

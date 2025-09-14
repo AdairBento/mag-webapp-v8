@@ -1,0 +1,15 @@
+
+FullName
+--------
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\.env
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\.env.enhanced
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\events-gateway\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\notifications-service\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\pdf-worker\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\web\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\node_modules\@mag\api\.env
+C:\Users\adair\PythonProject\mag-webapp-v8\node_modules\@mag\api\.env.enhanced
+C:\Users\adair\PythonProject\mag-webapp-v8\node_modules\@mag\api\.env.example
+C:\Users\adair\PythonProject\mag-webapp-v8\node_modules\@mag\events-gateway\.env.…
+C:\Users\adair\PythonProject\mag-webapp-v8\node_modules\@mag\web\.env.example

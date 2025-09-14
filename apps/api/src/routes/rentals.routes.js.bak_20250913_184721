@@ -1,0 +1,52 @@
+const express = require("express");
+const router  = express.Router();
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+// GET /api/v1/rentals
+router.get("/", async (req, res) => {
+  try {
+    const { tenantId, vehicleId, clientId, status, limit = 100 } = req.query;
+    const data = await prisma.rental.findMany({
+      where: {
+        tenantId: tenantId ? String(tenantId) : undefined,
+        vehicleId: vehicleId ? String(vehicleId) : undefined,
+        clientId:  clientId ? String(clientId) : undefined,
+        status: status || undefined
+      },
+      take: parseInt(limit, 10),
+      orderBy: { startDate: "desc" },
+    });
+    res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error:"internal_error", message:e.message });
+  }
+});
+
+// POST /api/v1/rentals
+router.post("/", async (req, res) => {
+  const id = req.body.tenantId || req.get("x-tenant-id") || req.query.tenantId;
+  const { vehicleId, clientId, startDate, endDate, dailyRate, status } = req.body;
+  if (!id)        return res.status(400).json({ error:"bad_request", message:"tenantId required" });
+  if (!vehicleId) return res.status(400).json({ error:"bad_request", message:"vehicleId required" });
+  if (!clientId)  return res.status(400).json({ error:"bad_request", message:"clientId required" });
+  if (!startDate) return res.status(400).json({ error:"bad_request", message:"startDate required" });
+  if (!endDate)   return res.status(400).json({ error:"bad_request", message:"endDate required" });
+  try {
+    const data = {
+      tenant:   { connect: { id: String(id) } },
+      vehicle:  { connect: { id: String(vehicleId) } },
+      client:   { connect: { id: String(clientId) } },
+      startDate: new Date(startDate),
+      endDate:   new Date(endDate),
+      dailyRate: String(dailyRate ?? "120.00"),
+      status:    status ?? "confirmed"
+    };
+    const created = await prisma.rental.create({ data });
+    res.status(201).json({ data: created });
+  } catch (e) {
+    res.status(400).json({ error:"bad_request", message:e.message });
+  }
+});
+
+module.exports = router;

@@ -1,0 +1,76 @@
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:67  app.get("/", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:72  app.get("/internal/health", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:75  app.get("/internal/health/extended", createHealthHandler({ prisma }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:77  app.post("/internal/seed", async (_req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:141  app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:212  app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:215  app.get("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:236  app.get("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:257  app.get("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:311  app.get("/api/v1/rentals/:id", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:323  app.post("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:349  app.post("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-025849.js:389  app.post("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:68  app.get("/", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:73  app.get("/internal/health", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:76  app.get("/internal/health/extended", createHealthHandler({ prisma }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:78  app.post("/internal/seed", async (_req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:142  app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:213  app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:216  app.get("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:237  app.get("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:258  app.get("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:312  app.get("/api/v1/rentals/:id", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:324  app.post("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:350  app.post("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-032557.js:390  app.post("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:67  app.get("/", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:72  app.get("/internal/health", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:75  app.get("/internal/health/extended", createHealthHandler({ prisma }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:77  app.post("/internal/seed", async (_req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:141  app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:212  app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:215  app.get("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:236  app.get("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:257  app.get("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:311  app.get("/api/v1/rentals/:id", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:323  app.post("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:349  app.post("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-20250911-033139.js:389  app.post("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:65  app.get("/", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:70  app.get("/internal/health", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:73  app.get("/internal/health/extended", createHealthHandler({ prisma }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:75  app.post("/internal/seed", async (_req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:130  app.get("/api/v1/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:131  app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:134  app.get("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:149  app.get("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:164  app.get("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:214  app.get("/api/v1/rentals/:id", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:224  app.post("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:239  app.post("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.backup-helpers.js:263  app.post("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:68  app.get("/", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:73  app.get("/internal/health", (_req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:76  app.get("/internal/health/extended", createHealthHandler({ prisma }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:78  app.post("/internal/seed", async (_req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:142  app.get("/api/v1/availability", normalizeAvailabilityParams, async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:213  app.get("/availability", normalizeAvailabilityParams, availabilityHandler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:216  app.get("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:237  app.get("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:258  app.get("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:312  app.get("/api/v1/rentals/:id", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:324  app.post("/api/v1/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:350  app.post("/api/v1/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\index.js:390  app.post("/api/v1/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\clients.js:10  router.get("/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\clients.js:33  router.post("/clients", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\clients.routes.js:4  // Ex.: router.get("/api/v1/clients", handler);
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\health.js:4  router.get("/internal/health", (req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\health.routes.js:6  // router.get("/internal/health", (req,res)=> res.json({ status:"ok", timestamp: new Date().toISOString() }));
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\public-seed.js:5  router.post("/tenants/:tenantId/seed", async (req, res) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\rentals.js:15  router.get("/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\rentals.js:42  router.post("/rentals", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\vehicles.js:13  router.get("/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\routes\vehicles.js:36  router.post("/vehicles", async (req, res, next) => {
+C:\Users\adair\PythonProject\mag-webapp-v8\apps\api\src\ui\internal\index.js:4  router.get("/clients", (req, res) => {

@@ -85,7 +85,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// 404 JSON (catch-all depois das rotas)
+app.use((_req, res) => res.status(404).json({ error: "route_not_found" }));
+
+// subir servidor
 app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));
-// teste husky 2
-// teste husky 2
-// teste husky 2

@@ -1,0 +1,231 @@
+[
+  {
+    "Message": "File 'scaffold-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 238,
+        "ColumnNumber": 31,
+        "Line": "  \"`n✅ Mudanças aplicadas.\" | Write-Host -ForegroundColor Green\r\n",
+        "Offset": 11576
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 238,
+        "ColumnNumber": 64,
+        "Line": "  \"`n✅ Mudanças aplicadas.\" | Write-Host -ForegroundColor Green\r\n",
+        "Offset": 11609
+      },
+      "StartLineNumber": 238,
+      "StartColumnNumber": 31,
+      "EndLineNumber": 238,
+      "EndColumnNumber": 64,
+      "Text": "Write-Host -ForegroundColor Green",
+      "StartOffset": 11576,
+      "EndOffset": 11609
+    },
+    "RuleName": "PSAvoidUsingWriteHost",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 238,
+    "Column": 31
+  },
+  {
+    "Message": "File 'scaffold-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 239,
+        "ColumnNumber": 115,
+        "Line": "  \"Dica: no apps/api, garanta dev-deps:  npm i -D vitest supertest tsx express-list-endpoints @types/supertest\" | Write-Host -ForegroundColor Yellow\r\n",
+        "Offset": 11725
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 239,
+        "ColumnNumber": 149,
+        "Line": "  \"Dica: no apps/api, garanta dev-deps:  npm i -D vitest supertest tsx express-list-endpoints @types/supertest\" | Write-Host -ForegroundColor Yellow\r\n",
+        "Offset": 11759
+      },
+      "StartLineNumber": 239,
+      "StartColumnNumber": 115,
+      "EndLineNumber": 239,
+      "EndColumnNumber": 149,
+      "Text": "Write-Host -ForegroundColor Yellow",
+      "StartOffset": 11725,
+      "EndOffset": 11759
+    },
+    "RuleName": "PSAvoidUsingWriteHost",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 239,
+    "Column": 115
+  },
+  {
+    "Message": "File 'scaffold-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 240,
+        "ColumnNumber": 100,
+        "Line": "  if(-not (Get-Command tsc -ErrorAction SilentlyContinue)){ \"tsc não encontrado (ok, opcional).\" | Write-Host -ForegroundColor DarkGray }\r\n",
+        "Offset": 11860
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 240,
+        "ColumnNumber": 136,
+        "Line": "  if(-not (Get-Command tsc -ErrorAction SilentlyContinue)){ \"tsc não encontrado (ok, opcional).\" | Write-Host -ForegroundColor DarkGray }\r\n",
+        "Offset": 11896
+      },
+      "StartLineNumber": 240,
+      "StartColumnNumber": 100,
+      "EndLineNumber": 240,
+      "EndColumnNumber": 136,
+      "Text": "Write-Host -ForegroundColor DarkGray",
+      "StartOffset": 11860,
+      "EndOffset": 11896
+    },
+    "RuleName": "PSAvoidUsingWriteHost",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 240,
+    "Column": 100
+  },
+  {
+    "Message": "File 'scaffold-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 242,
+        "ColumnNumber": 82,
+        "Line": "  \"`nNenhuma mudança aplicada. Rode com:  pwsh tools\\scaffold-safe.ps1 -Apply\" | Write-Host -ForegroundColor Yellow\r\n",
+        "Offset": 11991
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 242,
+        "ColumnNumber": 116,
+        "Line": "  \"`nNenhuma mudança aplicada. Rode com:  pwsh tools\\scaffold-safe.ps1 -Apply\" | Write-Host -ForegroundColor Yellow\r\n",
+        "Offset": 12025
+      },
+      "StartLineNumber": 242,
+      "StartColumnNumber": 82,
+      "EndLineNumber": 242,
+      "EndColumnNumber": 116,
+      "Text": "Write-Host -ForegroundColor Yellow",
+      "StartOffset": 11991,
+      "EndOffset": 12025
+    },
+    "RuleName": "PSAvoidUsingWriteHost",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 242,
+    "Column": 82
+  },
+  {
+    "Message": "Missing BOM encoding for non-ASCII encoded file 'scaffold-safe.ps1'",
+    "Extent": null,
+    "RuleName": "PSUseBOMForUnicodeEncodedFile",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": null,
+    "Column": null
+  },
+  {
+    "Message": "The cmdlet 'Ensure-Dir' uses an unapproved verb.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 18,
+        "ColumnNumber": 10,
+        "Line": "function Ensure-Dir($p){ if(-not (Test-Path $p)){ New-Item -ItemType Directory -Force -Path $p | Out-Null } }\r\n",
+        "Offset": 593
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 18,
+        "ColumnNumber": 20,
+        "Line": "function Ensure-Dir($p){ if(-not (Test-Path $p)){ New-Item -ItemType Directory -Force -Path $p | Out-Null } }\r\n",
+        "Offset": 603
+      },
+      "StartLineNumber": 18,
+      "StartColumnNumber": 10,
+      "EndLineNumber": 18,
+      "EndColumnNumber": 20,
+      "Text": "Ensure-Dir",
+      "StartOffset": 593,
+      "EndOffset": 603
+    },
+    "RuleName": "PSUseApprovedVerbs",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 18,
+    "Column": 10
+  },
+  {
+    "Message": "Function 'Update-File' has verb that could change system state. Therefore, the function has to support 'ShouldProcess'.",
+    "Extent": {
+      "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+      "StartScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 24,
+        "ColumnNumber": 10,
+        "Line": "function Update-File([string]$Path,[ScriptBlock]$Transform,[string]$Reason=\"update\"){\r\n",
+        "Offset": 1010
+      },
+      "EndScriptPosition": {
+        "File": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+        "LineNumber": 24,
+        "ColumnNumber": 21,
+        "Line": "function Update-File([string]$Path,[ScriptBlock]$Transform,[string]$Reason=\"update\"){\r\n",
+        "Offset": 1021
+      },
+      "StartLineNumber": 24,
+      "StartColumnNumber": 10,
+      "EndLineNumber": 24,
+      "EndColumnNumber": 21,
+      "Text": "Update-File",
+      "StartOffset": 1010,
+      "EndOffset": 1021
+    },
+    "RuleName": "PSUseShouldProcessForStateChangingFunctions",
+    "Severity": 1,
+    "ScriptName": "scaffold-safe.ps1",
+    "ScriptPath": "C:\\Users\\adair\\PythonProject\\mag-webapp-v8\\tools\\scaffold-safe.ps1",
+    "RuleSuppressionID": null,
+    "SuggestedCorrections": null,
+    "IsSuppressed": false,
+    "Line": 24,
+    "Column": 10
+  }
+]
